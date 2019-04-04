@@ -19,8 +19,7 @@
 #include "log.h"
 #include "display.h"
 #include "hardware/kit/common/drivers/display.h"
-//#include "scheduler.h" // Add a reference to your module supporting scheduler events for display update
-//#include "timer.h" // Add a reference to your module supporting configuration of underflow events here
+#include "letimer.h" // Add a reference to your module supporting configuration of underflow events here
 
 
 #if ECEN5823_INCLUDE_DISPLAY_SUPPORT
@@ -78,7 +77,7 @@ static void displayUpdateWriteBuffer(struct display_data *display)
 	GLIB_Context_t *context = &display->context;
 	EMSTATUS result = GLIB_clear(context);
 	if( result != GLIB_OK ) {
-		LOG_ERROR("GLIB_Clear failed with result %d",(int)result);
+//		LOG_ERROR("GLIB_Clear failed with result %d",(int)result);
 	} else {
 		/**
 		 * See example in graphics.c graphPrintCenter()
@@ -87,8 +86,8 @@ static void displayUpdateWriteBuffer(struct display_data *display)
 			uint8_t row_len = strnlen(display->row_data[row],DISPLAY_ROW_LEN);
 			uint8_t row_width = row_len * context->font.fontWidth;
 			if( row_width > context->pDisplayGeometry->xSize ) {
-				LOG_ERROR("Content of display row %d (%s) with length %d font width %d is too wide for display geometry size %d",
-						row,&display->row_data[row][0],row_len,context->font.fontWidth,context->pDisplayGeometry->xSize);
+//				LOG_ERROR("Content of display row %d (%s) with length %d font width %d is too wide for display geometry size %d",
+//						row,&display->row_data[row][0],row_len,context->font.fontWidth,context->pDisplayGeometry->xSize);
 			} else {
 				uint8_t posX = (context->pDisplayGeometry->xSize - row_width) >> 1;
 				uint8_t posY = ((context->font.lineSpacing + context->font.fontHeight) * row)
@@ -99,11 +98,11 @@ static void displayUpdateWriteBuffer(struct display_data *display)
 						/**
 						 * This error happens if the content of the draw string did not change
 						 */
-						LOG_DEBUG("GLIB_drawString returned GLIB_ERROR_NOTHING_TO_DRAW for string %s len %d",&display->row_data[row][0],row_len);
+//						LOG_DEBUG("GLIB_drawString returned GLIB_ERROR_NOTHING_TO_DRAW for string %s len %d",&display->row_data[row][0],row_len);
 						result = GLIB_OK;
 					} else {
-						LOG_ERROR("GLIB_drawString failed with result %d for content %s length %d at X=%d Y=%d",
-								(int)result,&display->row_data[row][0],row_len,posX,posY);
+//						LOG_ERROR("GLIB_drawString failed with result %d for content %s length %d at X=%d Y=%d",
+//								(int)result,&display->row_data[row][0],row_len,posX,posY);
 					}
 				}
 			}
@@ -111,7 +110,7 @@ static void displayUpdateWriteBuffer(struct display_data *display)
 	}
 	result = DMD_updateDisplay();
 	if( result != DMD_OK ) {
-		LOG_ERROR("DMD_updateDisplay failed with result %d",(int)result);
+//		LOG_ERROR("DMD_updateDisplay failed with result %d",(int)result);
 	}
 }
 
@@ -119,24 +118,24 @@ void displayPrintf(enum display_row row, const char *format, ... )
 {
 	struct display_data *display = displayGetData();
 	if( row >= DISPLAY_ROW_MAX ) {
-		LOG_WARN("Row %d exceeded max row, ignoring write request",row);
+//		LOG_WARN("Row %d exceeded max row, ignoring write request",row);
 	} else {
 		va_list args;
 		va_start (args, format);
 		int chars_written = vsnprintf(&display->row_data[row][0],DISPLAY_ROW_LEN,format,args);
 		va_end(args);
 		if( chars_written < 0 ) {
-			LOG_WARN("Error encoding format string %s",format);
+//			LOG_WARN("Error encoding format string %s",format);
 		}
 		if( chars_written >= DISPLAY_ROW_LEN ) {
-			LOG_WARN("Exceeded row buffer length for row %d with format string %s",row,format);
+//			LOG_WARN("Exceeded row buffer length for row %d with format string %s",row,format);
 			chars_written = DISPLAY_ROW_LEN -1;
 		}
 		/**
 		 * Ensure null terminator
 		 */
 		display->row_data[row][chars_written] = 0;
-		LOG_DEBUG("Updating display row %d with content \"%s\"",row,&display->row_data[row][0]);
+//		LOG_DEBUG("Updating display row %d with content \"%s\"",row,&display->row_data[row][0]);
 	}
 
 	displayUpdateWriteBuffer(display);
@@ -153,16 +152,16 @@ static void displayGlibInit(GLIB_Context_t *context)
 	/* Initialize the display module. */
 	status = DISPLAY_Init();
 	if (DISPLAY_EMSTATUS_OK != status) {
-		LOG_ERROR("Failed to init display, error was %d",(int)status);
+//		LOG_ERROR("Failed to init display, error was %d",(int)status);
 	} else {
 		/* Initialize the DMD module for the DISPLAY device driver. */
 		status = DMD_init(0);
 		if (DISPLAY_EMSTATUS_OK != status) {
-			LOG_ERROR("Failed to init DMD, error was %d",(int)status);
+//			LOG_ERROR("Failed to init DMD, error was %d",(int)status);
 		} else {
 			status = GLIB_contextInit(context);
 			if (DISPLAY_EMSTATUS_OK != status) {
-				LOG_ERROR("Failed to init GLIB context, error was %d",(int)status);
+//				LOG_ERROR("Failed to init GLIB context, error was %d",(int)status);
 			} else {
 				context->backgroundColor = White;
 				context->foregroundColor = Black;
@@ -170,7 +169,7 @@ static void displayGlibInit(GLIB_Context_t *context)
 				/* Use Narrow font */
 				status = GLIB_setFont(context, (GLIB_Font_t *)&GLIB_FontNarrow6x8);
 				if( GLIB_OK != status ) {
-					LOG_ERROR("Failed to set font to GLIB_FontNarrow6x8 in GLIB_setFont, error was %d",(int)status);
+//					LOG_ERROR("Failed to set font to GLIB_FontNarrow6x8 in GLIB_setFont, error was %d",(int)status);
 				}
 			}
 		}
@@ -222,7 +221,7 @@ bool displayUpdate()
 #else
 #warning "gpioSetDisplayExtcomin is not implemented.  Please implement for display support"
 #endif
-	LOG_DEBUG("Display extcomin state is now %s",display->last_extcomin_state_high ? "high" : "low");
+//	LOG_DEBUG("Display extcomin state is now %s",display->last_extcomin_state_high ? "high" : "low");
 	return true;
 }
 

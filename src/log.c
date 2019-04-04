@@ -16,8 +16,8 @@
  */
 uint32_t loggerGetTimestamp(void)
 {
-	//return timerGetRunTimeMilliseconds();
-	return 0;
+	return ((timer_count * TIME_PERIOD * 3) + (LETIMER_CounterGet(LETIMER0))*(divCalc/32768));
+//	return 0;
 }
 
 /**

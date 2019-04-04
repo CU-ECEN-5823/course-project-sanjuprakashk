@@ -30,6 +30,7 @@
 #include "gatt_db.h"
 #include <gecko_configuration.h>
 #include <mesh_sizes.h>
+#include<stdbool.h>
 
 /* Libraries containing default Gecko configuration values */
 #include "em_emu.h"
@@ -45,6 +46,19 @@
 #include "bspconfig.h"
 #endif
 #include "src/ble_mesh_device_type.h"
+
+
+#include "src/gpio.h"
+#include "src/log.h"
+#include "src/display.h"
+#include "src/letimer.h"
+
+#include "mesh_generic_model_capi_types.h"
+
+//#include "mesh_lib.h"
+
+#define FACTORY_RESET_ID 78
+#define TIMER_RESTART_ID 77
 
 /***********************************************************************************************//**
  * @addtogroup Application
@@ -72,6 +86,13 @@ uint8_t bluetooth_stack_heap[DEFAULT_BLUETOOTH_HEAP(MAX_CONNECTIONS) + BTMESH_HE
 // (one for each network key, handle numbers 4 .. N+3)
 //
 #define MAX_ADVERTISERS (4 + MESH_CFG_MAX_NETKEYS)
+
+extern uint8_t pin_state;
+
+
+uint16_t index = 0x00;
+
+uint8_t transaction_id = 0;
 
 static gecko_bluetooth_ll_priorities linklayer_priorities = GECKO_BLUETOOTH_PRIORITIES_DEFAULT;
 
@@ -195,19 +216,208 @@ void gecko_main_init()
 
 }
 
+
+void set_device_name(bd_addr *addr)
+{
+	char name[20];
+	if(DeviceUsesServerModel())
+		sprintf(name,"5823Sub %02x:%02x", addr->addr[1], addr->addr[0]);
+	else if(DeviceUsesClientModel())
+		sprintf(name,"5823Pub %02x:%02x", addr->addr[1], addr->addr[0]);
+
+	LOG_INFO("Device name = %s\n", name);
+
+	gecko_cmd_gatt_server_write_attribute_value(gattdb_device_name, 0, strlen(name), (uint8 *)name);
+}
+
+
+void level_update_publish(bool button_state)
+{
+//	struct mesh_generic_state pub_data;
+//
+//	pub_data.kind = mesh_generic_state_on_off;
+//	pub_data.on_off.on = data;
+
+	transaction_id +=1;
+	struct mesh_generic_request custom_pub;
+	custom_pub.kind = mesh_generic_request_on_off;
+	custom_pub.on_off = button_state;
+	int result = mesh_lib_generic_client_publish(MESH_GENERIC_ON_OFF_CLIENT_MODEL_ID, index, transaction_id, &custom_pub, false,false,false);
+
+	if(result)
+		LOG_INFO("Error in publishing %x\n",result);
+	else
+		LOG_INFO("Publish success\n");
+}
+
+/* Referenced the Silicon Labs bluetooth mesh light and switch example */
 void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
 {
+  uint16_t result;
   switch (evt_id) {
     case gecko_evt_system_boot_id:
-      // Initialize Mesh stack in Node operation mode, wait for initialized event
-      gecko_cmd_mesh_node_init();
+    	LOG_INFO("Booted\n");
+      if(GPIO_PinInGet(PB0_PORT, PB0_PIN ) == 0 || GPIO_PinInGet(PB1_PORT, PB1_PIN ) == 0)
+      {
+    	  // Erase persistent storage
+    	  gecko_cmd_flash_ps_erase_all();
+
+    	  LOG_INFO("Factory Reset\n");
+    	  displayPrintf(DISPLAY_ROW_ACTION,"Factory Reset");
+
+    	  // Wait for 2 seconds
+    	  gecko_cmd_hardware_set_soft_timer(2 * 32768, FACTORY_RESET_ID, 1);
+      }
+
+      else
+      {
+    	  struct gecko_msg_system_get_bt_address_rsp_t *gecko_bt_addr = gecko_cmd_system_get_bt_address();
+
+    	  gecko_bt_addr = gecko_cmd_system_get_bt_address();
+
+		 /* Display server bluettoth address */
+		 displayPrintf(DISPLAY_ROW_BTADDR,"%02x:%02x:%02x:%02x:%02x:%02x", gecko_bt_addr->address.addr[5],
+																		   gecko_bt_addr->address.addr[4],
+																		   gecko_bt_addr->address.addr[3],
+																		   gecko_bt_addr->address.addr[2],
+																		   gecko_bt_addr->address.addr[1],
+																		   gecko_bt_addr->address.addr[0]);
+
+    	  if(DeviceUsesServerModel())
+    	  {
+    		  LOG_INFO("Subscriber\n");
+			  displayPrintf(DISPLAY_ROW_NAME, "Subscriber");
+    	  }
+
+    	  else if(DeviceUsesClientModel())
+    	  {
+    		  LOG_INFO("Publisher\n");
+
+			  displayPrintf(DISPLAY_ROW_NAME, "Publisher");
+    	  }
+    	  set_device_name(&gecko_bt_addr->address);
+
+    	  // Initialize Mesh stack in Node operation mode, wait for initialized event
+    	  gecko_cmd_mesh_node_init();
+
+
+      }
       break;
+
+    case gecko_evt_hardware_soft_timer_id:
+    	LOG_INFO(" Handler\n");
+    	switch (evt->data.evt_hardware_soft_timer.handle) {
+
+    	case FACTORY_RESET_ID:
+    		displayPrintf(DISPLAY_ROW_ACTION,"Factory Reset");
+    		LOG_INFO("Reset handler\n");
+    		// Resetting device to complete factory reset
+    		gecko_cmd_system_reset(0);
+    		break;
+    	case TIMER_RESTART_ID:
+
+    		gecko_cmd_system_reset(0);
+    		break;
+    	}
+    	break;
+
     case gecko_evt_mesh_node_initialized_id:
+
+      LOG_INFO("Node Initialized\n");
+
+      if (evt->data.evt_mesh_node_initialized.provisioned && DeviceUsesServerModel()) {
+    	  result = gecko_cmd_mesh_generic_server_init()->result;
+
+    	  if(result)
+    		  LOG_INFO("Mesh server init failed with code %d\n", result);
+      }
+
+      if (evt->data.evt_mesh_node_initialized.provisioned && DeviceUsesClientModel()) {
+
+    	  	  PB0_interrupt_enable();
+
+    	  	  result = gecko_cmd_mesh_generic_client_init()->result;
+
+         	  if(result)
+         		  LOG_INFO("Mesh client init failed with code %d", result);
+      }
+
+      if(evt->data.evt_mesh_node_initialized.provisioned && DeviceIsOnOffPublisher())
+      {
+    	  LOG_INFO("mesh_lib_init");
+    	  mesh_lib_init(malloc,free,8);
+      }
+
+      if(evt->data.evt_mesh_node_initialized.provisioned && DeviceIsOnOffSubscriber())
+      {
+    	  LOG_INFO("mesh_lib_init");
+    	  mesh_lib_init(malloc,free,9);
+//    	  mesh_lib_generic_server_register_handler();
+//    	  mesh_lib_generic_server_update();
+//    	  mesh_lib_generic_server_publish();
+      }
+
       if (!evt->data.evt_mesh_node_initialized.provisioned) {
         // The Node is now initialized, start unprovisioned Beaconing using PB-ADV and PB-GATT Bearers
         gecko_cmd_mesh_node_start_unprov_beaconing(0x3);
+        displayPrintf(DISPLAY_ROW_ACTION,"unprovisioned");
       }
+
+      if(evt->data.evt_mesh_node_initialized.provisioned)
+      {
+    	  displayPrintf(DISPLAY_ROW_ACTION,"provisioned");
+      }
+
       break;
+
+    case gecko_evt_mesh_node_provisioning_started_id:
+    	displayPrintf(DISPLAY_ROW_ACTION,"provisioning");
+    	LOG_INFO("provisioning\n");
+    	break;
+
+    case gecko_evt_mesh_node_provisioned_id:
+    	displayPrintf(DISPLAY_ROW_ACTION,"provisioned");
+    	LOG_INFO("provisioned\n");
+
+    	gecko_cmd_hardware_set_soft_timer(32768*2, TIMER_RESTART_ID, 1);
+    	break;
+
+    case gecko_evt_mesh_node_provisioning_failed_id:
+    	displayPrintf(DISPLAY_ROW_ACTION,"provision fail");
+    	LOG_INFO("provision fail\n");
+    	break;
+
+    case gecko_evt_mesh_generic_server_client_request_id:
+    	if(DeviceUsesServerModel())
+    	{
+    		uint8_t button_press;
+    		button_press = evt->data.evt_mesh_generic_server_client_request.parameters.data[0];
+    		LOG_INFO("MESH BUTTON SUB STATE = %d", button_press);
+//    		mesh_lib_generic_server_event_handler(evt);
+
+    		if(button_press == 1)
+			{
+				displayPrintf(DISPLAY_ROW_TEMPVALUE, "Button Pressed");
+			}
+			else
+			{
+				displayPrintf(DISPLAY_ROW_TEMPVALUE, "Button Released");
+			}
+    	}
+    	break;
+
+    case gecko_evt_mesh_generic_server_state_changed_id:
+    	if(DeviceUsesServerModel())
+		{
+    		mesh_lib_generic_server_event_handler(evt);
+		}
+    	break;
+
+    case gecko_evt_le_connection_opened_id:
+    	LOG_INFO("Connected");
+    	displayPrintf(DISPLAY_ROW_CONNECTION,"connected");
+    	break;
+
     case gecko_evt_le_connection_closed_id:
       /* Check if need to boot to dfu mode */
       if (boot_to_dfu) {
@@ -215,6 +425,16 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
         gecko_cmd_system_reset(2);
       }
       break;
+
+    case gecko_evt_mesh_node_reset_id:
+    	gecko_cmd_flash_ps_erase_all();
+
+    	LOG_INFO("Factory Reset 2\n");
+
+	    // Wait for 2 seconds
+	    gecko_cmd_hardware_set_soft_timer(2 * 32768, FACTORY_RESET_ID, 1);
+    	break;
+
     case gecko_evt_gatt_server_user_write_request_id:
       if (evt->data.evt_gatt_server_user_write_request.characteristic == gattdb_ota_control) {
         /* Set flag to enter to OTA mode */
@@ -229,6 +449,31 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
         gecko_cmd_le_connection_close(evt->data.evt_gatt_server_user_write_request.connection);
       }
       break;
+
+    case gecko_evt_system_external_signal_id:
+    	if((evt->data.evt_system_external_signal.extsignals & DISP_INT_MASK))
+		{
+    		CORE_AtomicDisableIrq();
+			interrupt_flags_set &= ~(DISP_INT_MASK); // Disable COMP1 Interrupt bit mask
+			CORE_AtomicEnableIrq();
+			displayUpdate();
+			LOG_DEBUG("Display update call");
+		}
+
+    	if((DeviceIsOnOffPublisher())&&(evt->data.evt_system_external_signal.extsignals & BUTTON_INT_MASK) != 0)
+		{
+			CORE_AtomicDisableIrq();
+			interrupt_flags_set &= ~(BUTTON_INT_MASK); // Disable Button PB0 Interrupt bit mask
+			CORE_AtomicEnableIrq();
+
+			bool value = !pin_state;
+
+			LOG_INFO("Button state = %d\n",value);
+
+			level_update_publish(value);
+		}
+    	break;
+
     default:
       break;
   }
