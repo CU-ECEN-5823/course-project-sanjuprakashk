@@ -17,6 +17,8 @@
 #define LED1_pin 5
 
 extern uint8_t pin_state;
+extern uint8_t fall_state;
+
 extern volatile uint8_t pin_pressed_flag;
 extern uint32_t interrupt_flags_set;
 
@@ -32,6 +34,8 @@ void gpioInit()
 	GPIO_PinModeSet(PB1_PORT, PB1_PIN, gpioModeInput, false); // Enable button PB1
 
 	GPIO_PinModeSet(PB0_PORT, PB0_PIN, gpioModeInput, false); // Enable button PB0
+
+	GPIO_PinModeSet(PC7_PORT, PC7_PIN, gpioModeInput, false); // Enable button PF1
 
 }
 
@@ -72,10 +76,17 @@ void gpioSetDisplayExtcomin(bool high)
 
 void PB0_interrupt_enable()
 {
-	NVIC_EnableIRQ(GPIO_EVEN_IRQn);
+	GPIOINT_Init();
+
+	GPIO_IntConfig(PC7_PORT, PC7_PIN, true, true, true); // Enable GPIO interrupt
+
+	GPIO_IntEnable(1<<PC7_PIN);
 
 	GPIO_IntConfig(PB0_PORT, PB0_PIN, true, true, true); // Enable GPIO interrupt
+
+	GPIO_IntEnable(1<<PB0_PIN);
 }
+
 void GPIO_EVEN_IRQHandler()
 {
 	int flag = GPIO_IntGet();
@@ -99,4 +110,20 @@ void GPIO_EVEN_IRQHandler()
 
 	gecko_external_signal(interrupt_flags_set); // Set gecko external event
 
+}
+
+void GPIO_ODD_IRQHandler()
+{
+	int flag = GPIO_IntGet();
+
+	fall_state = GPIO_PinInGet(PC7_PORT, PC7_PIN);
+
+	interrupt_flags_set |= FALL_INT_MASK;
+
+	LOG_INFO("State of gpio in interrupt = %d", fall_state);
+
+	GPIO_IntClear(flag);
+
+
+	gecko_external_signal(interrupt_flags_set); // Set gecko external event
 }
