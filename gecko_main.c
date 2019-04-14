@@ -52,6 +52,8 @@
 #include "src/log.h"
 #include "src/display.h"
 #include "src/letimer.h"
+#include "src/i2c_config.h"
+
 
 #include "mesh_generic_model_capi_types.h"
 
@@ -88,6 +90,7 @@ uint8_t bluetooth_stack_heap[DEFAULT_BLUETOOTH_HEAP(MAX_CONNECTIONS) + BTMESH_HE
 #define MAX_ADVERTISERS (4 + MESH_CFG_MAX_NETKEYS)
 
 extern uint8_t pin_state;
+extern uint8_t fall_state;
 
 
 uint16_t index = 0x00;
@@ -468,7 +471,26 @@ void handle_gecko_event(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 			bool value = !pin_state;
 
+			i2c_read(0X00,1);
+
 			LOG_INFO("Button state = %d\n",value);
+
+			level_update_publish(value);
+		}
+
+    	if((DeviceIsOnOffPublisher())&&(evt->data.evt_system_external_signal.extsignals & FALL_INT_MASK) != 0)
+		{
+			CORE_AtomicDisableIrq();
+			interrupt_flags_set &= ~(FALL_INT_MASK); // Disable Fall Interrupt bit mask
+			CORE_AtomicEnableIrq();
+
+			bool value = fall_state;
+
+			LOG_INFO("Fall state = %d\n",value);
+
+			i2c_read(0X16,1);
+
+			LOG_INFO("READ RESULT = %x\n", data_array[0]);
 
 			level_update_publish(value);
 		}

@@ -9,6 +9,7 @@
 #define SRC_GPIO_H_
 #include <stdbool.h>
 #include "native_gecko.h"
+#include "gpiointerrupt.h"
 
 #define LCD_PORT  gpioPortD
 #define LCD_PIN	  15
@@ -21,10 +22,14 @@
 #define PB1_PORT	gpioPortF
 #define PB1_PIN		7
 
+#define PC7_PORT	gpioPortC
+#define PC7_PIN		7
+
 #define GPIO_DISPLAY_SUPPORT_IMPLEMENTED 1
 #define GPIO_SET_DISPLAY_EXT_COMIN_IMPLEMENTED 1
 
 #define BUTTON_INT_MASK (1UL << 5)
+#define FALL_INT_MASK	(1UL << 6)
 
 
 void gpioInit();
