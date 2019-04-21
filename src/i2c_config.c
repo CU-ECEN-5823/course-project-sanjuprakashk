@@ -90,36 +90,36 @@ int8_t i2c_write(uint8_t offset, uint8_t write_data)
 
 int8_t accel_config_freefall()
 {
-//	if(i2c_write(0x15, 0xB8) != 0)
-//		return -1;
-//
-//	if(i2c_write(0x17, 0x03) != 0)
-//		return -1;
-//
-//	if(i2c_write(0x18, 0x01) != 0)
-//		return -1;
-//
-//	if(i2c_read(0x2D, 1) != 0)
-//		return -1;
-//
-//	int temp = data_array[0];
-//	temp = 0x04;
-//
-//	if(i2c_write(0x2D, temp) != 0)
-//		return -1;
-//
-//	if(i2c_write(0x2E, 0x00) != 0)
-//		return -1;
+	if(i2c_write(0x15, 0xB8) != 0)
+		return -1;
 
-	i2c_write(0x15, 0xB8);
+	if(i2c_write(0x17, 0x03) != 0)
+		return -1;
 
-	i2c_write(0x17, 0x03);
+	if(i2c_write(0x18, 0x01) != 0)
+		return -1;
 
-	i2c_write(0x18, 0x02);
+	if(i2c_read(0x2D, 1) != 0)
+		return -1;
 
-	i2c_write(0x2D, 0x04);
+	int temp = data_array[0];
+	temp = 0x04;
 
-	i2c_write(0x2E, 0x00);
+	if(i2c_write(0x2D, temp) != 0)
+		return -1;
+
+	if(i2c_write(0x2E, 0x00) != 0)
+		return -1;
+//
+//	i2c_write(0x15, 0xB8);
+//
+//	i2c_write(0x17, 0x03);
+//
+//	i2c_write(0x18, 0x02);
+//
+//	i2c_write(0x2D, 0x04);
+//
+//	i2c_write(0x2E, 0x00);
 
 	return 0;
 }

@@ -226,7 +226,7 @@ void lpn_init(void)
   result = gecko_cmd_mesh_lpn_establish_friendship(0)->result;
 
   if (result != 0) {
-	LOG_INFO("ret.code %x\r\n", result);
+	LOG_DEBUG("ret.code %x\r\n", result);
   }
 }
 
@@ -264,7 +264,7 @@ void set_device_name(bd_addr *addr)
 	else if(DeviceUsesClientModel())
 		sprintf(name,"5823Pub %02x:%02x", addr->addr[1], addr->addr[0]);
 
-	LOG_INFO("Device name = %s\n", name);
+	LOG_DEBUG("Device name = %s\n", name);
 
 	gecko_cmd_gatt_server_write_attribute_value(gattdb_device_name, 0, strlen(name), (uint8 *)name);
 }
@@ -283,7 +283,7 @@ void level_update_publish(int8_t button_state)
 
 	if(result)
 	{
-		LOG_INFO("Error is publish update\n");
+		LOG_ERROR("Error is publish update\n");
 	}
 
 	else
@@ -294,7 +294,7 @@ void level_update_publish(int8_t button_state)
 
 		if(result)
 		{
-			LOG_INFO("Error is publish\n");
+			LOG_ERROR("Error is publish\n");
 		}
 		else
 		{
@@ -348,12 +348,11 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
       break;
 
     case gecko_evt_hardware_soft_timer_id:
-    	LOG_INFO(" Handler\n");
     	switch (evt->data.evt_hardware_soft_timer.handle) {
 
     	case FACTORY_RESET_ID:
     		displayPrintf(DISPLAY_ROW_ACTION,"Factory Reset");
-    		LOG_INFO("Reset handler\n");
+    		LOG_DEBUG("Reset handler\n");
     		// Resetting device to complete factory reset
     		gecko_cmd_system_reset(0);
     		break;
@@ -389,7 +388,7 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
       result = gecko_cmd_mesh_generic_server_init()->result;
 
       if(result)
-    	  LOG_INFO("Mesh server init failed with code %d\n", result);
+    	  LOG_ERROR("Mesh server init failed with code %d\n", result);
 
 
 
@@ -441,7 +440,7 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
     case gecko_evt_mesh_generic_server_client_request_id:
 
     	friend_data = evt->data.evt_mesh_generic_server_client_request.parameters.data[0];
-		LOG_INFO("MESH BUTTON SUB STATE = %d", friend_data);
+		LOG_INFO("DATA RECEIVED STATE = %d\n", friend_data);
 
 
 		if(friend_data == 1)
@@ -498,13 +497,13 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
       break;
 
     case gecko_evt_mesh_lpn_friendship_failed_id:
-	  LOG_INFO("friendship failed\r\n");
+	  LOG_ERROR("friendship failed\r\n");
 	  // try again in 2 seconds
 	  result = gecko_cmd_hardware_set_soft_timer(TIMER_MS_2_TIMERTICK(2000),
 												 TIMER_ID_FRIEND_FIND,
 												 1)->result;
 	  if (result) {
-		LOG_INFO("timer failure?!  %x\r\n", result);
+		LOG_ERROR("timer failure?!  %x\r\n", result);
 	  }
 	  break;
 
@@ -516,7 +515,7 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 												   TIMER_ID_FRIEND_FIND,
 												   1)->result;
 		if (result) {
-		  printf("timer failure?!  %x\r\n", result);
+		  LOG_ERROR("timer failure?!  %x\r\n", result);
 		}
 	  }
 	  break;

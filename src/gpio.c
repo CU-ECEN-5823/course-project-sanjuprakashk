@@ -102,12 +102,11 @@ void GPIO_EVEN_IRQHandler()
 	if(!pin_state)
 	{
 		pin_pressed_flag = 1;
-		LOG_INFO("State of pin pressed flag in interrupt = %d", pin_pressed_flag);
+		LOG_DEBUG("State of pin pressed flag in interrupt = %d", pin_pressed_flag);
 	}
 
-	LOG_INFO("State of pin in interrupt = %d", pin_state);
+	LOG_DEGUB("State of pin in interrupt = %d", pin_state);
 
-	CORE_ATOMIC_IRQ_DISABLE();
 	interrupt_flags_set |= BUTTON_INT_MASK;
 
 
@@ -122,12 +121,12 @@ void GPIO_ODD_IRQHandler()
 {
 //	SLEEP_SleepBlockEnd(sleepEM3);
 
-	LOG_INFO("INSIDE INTERRUPT");
+	LOG_DEBUG("INSIDE INTERRUPT");
 	int flag = GPIO_IntGet();
 
-	LOG_INFO("INT FLAG = %d\n", flag);
+	LOG_DEBUG("INT FLAG = %d\n", flag);
 
-	if(flag == 0x80)
+	if(flag == 0x80) // Fall flag set
 	{
 		tap_state = GPIO_PinInGet(GPIO_TAP_INT_PORT, GPIO_TAP_INT_PIN);
 
@@ -135,7 +134,7 @@ void GPIO_ODD_IRQHandler()
 
 //		i2c_read(0x16, 1);
 
-		LOG_INFO("State of tap gpio in interrupt = %d", tap_state);
+		LOG_DEBUG("State of tap gpio in interrupt = %d", tap_state);
 
 		interrupt_flags_set |= TAP_INT_MASK;
 	}
@@ -147,17 +146,11 @@ void GPIO_ODD_IRQHandler()
 
 		i2c_read(0x16, 1);
 
-		LOG_INFO("State of fall gpio in interrupt = %d", fall_state);
+		LOG_DEBUG("State of fall gpio in interrupt = %d", fall_state);
 
 		interrupt_flags_set |= FALL_INT_MASK;
 
 	}
-
-//	interrupt_flags_set |= FALL_INT_MASK;
-//
-//	LOG_INFO("State of gpio in interrupt = %d", fall_state);
-//
-//	LOG_INFO("Tap interrupt = %x", flag);
 
 	GPIO_IntClear(flag);
 
