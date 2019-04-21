@@ -38,13 +38,15 @@ i2c_init
 * 	@\return		void
 *
 **/
-void i2c_init();
+int8_t i2c_init();
 
-void i2c_transfer(uint16_t device_address, uint8_t cmd_array[], uint8_t data_array[], uint16_t data_length, uint8_t cmd_length, uint8_t flags);
+int8_t i2c_transfer(uint16_t device_address, uint8_t cmd_array[], uint8_t data_array[], uint16_t data_length, uint8_t cmd_length, uint8_t flags);
 
-uint8_t i2c_read(uint8_t offset, uint8_t data_len);
+int8_t i2c_read(uint8_t offset, uint8_t data_len);
 
-void i2c_write(uint8_t offset, uint8_t write_data);
+int8_t i2c_write(uint8_t offset, uint8_t write_data);
 
-void accel_config();
+int8_t accel_config_freefall();
+
+int8_t accel_config_tap();
 #endif

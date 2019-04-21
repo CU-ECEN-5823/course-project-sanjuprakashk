@@ -18,6 +18,7 @@
 
 extern uint8_t pin_state;
 extern uint8_t fall_state;
+extern uint8_t tap_state;
 
 extern volatile uint8_t pin_pressed_flag;
 extern uint32_t interrupt_flags_set;
@@ -35,7 +36,8 @@ void gpioInit()
 
 	GPIO_PinModeSet(PB0_PORT, PB0_PIN, gpioModeInput, false); // Enable button PB0
 
-	GPIO_PinModeSet(PC7_PORT, PC7_PIN, gpioModeInput, false); // Enable button PF1
+	GPIO_PinModeSet(GPIO_TAP_INT_PORT, GPIO_TAP_INT_PIN, gpioModeInput, false); // Enable button PC9
+	GPIO_PinModeSet(GPIO_FALL_INT_PORT, GPIO_FALL_INT_PIN, gpioModeInput, false);
 
 }
 
@@ -78,9 +80,13 @@ void PB0_interrupt_enable()
 {
 	GPIOINT_Init();
 
-	GPIO_IntConfig(PC7_PORT, PC7_PIN, true, true, true); // Enable GPIO interrupt
+	GPIO_IntConfig(GPIO_TAP_INT_PORT, GPIO_TAP_INT_PIN, true, false, true); // Enable GPIO interrupt, rising edge triggered
 
-	GPIO_IntEnable(1<<PC7_PIN);
+	GPIO_IntEnable(1<<GPIO_TAP_INT_PIN);
+
+	GPIO_IntConfig(GPIO_FALL_INT_PORT, GPIO_FALL_INT_PIN, true, true, true);
+
+	GPIO_IntEnable(1<<GPIO_FALL_INT_PIN);
 
 	GPIO_IntConfig(PB0_PORT, PB0_PIN, true, true, true); // Enable GPIO interrupt
 
@@ -114,16 +120,49 @@ void GPIO_EVEN_IRQHandler()
 
 void GPIO_ODD_IRQHandler()
 {
+//	SLEEP_SleepBlockEnd(sleepEM3);
+
+	LOG_INFO("INSIDE INTERRUPT");
 	int flag = GPIO_IntGet();
 
-	fall_state = GPIO_PinInGet(PC7_PORT, PC7_PIN);
+	LOG_INFO("INT FLAG = %d\n", flag);
 
-	interrupt_flags_set |= FALL_INT_MASK;
+	if(flag == 0x80)
+	{
+		tap_state = GPIO_PinInGet(GPIO_TAP_INT_PORT, GPIO_TAP_INT_PIN);
 
-	LOG_INFO("State of gpio in interrupt = %d", fall_state);
+		i2c_read(0x22, 1);
+
+//		i2c_read(0x16, 1);
+
+		LOG_INFO("State of tap gpio in interrupt = %d", tap_state);
+
+		interrupt_flags_set |= TAP_INT_MASK;
+	}
+	if(flag == 0x200) // Tap flag set
+	{
+		fall_state = GPIO_PinInGet(GPIO_FALL_INT_PORT, GPIO_FALL_INT_PIN);
+
+//		i2c_read(0x22, 1);
+
+		i2c_read(0x16, 1);
+
+		LOG_INFO("State of fall gpio in interrupt = %d", fall_state);
+
+		interrupt_flags_set |= FALL_INT_MASK;
+
+	}
+
+//	interrupt_flags_set |= FALL_INT_MASK;
+//
+//	LOG_INFO("State of gpio in interrupt = %d", fall_state);
+//
+//	LOG_INFO("Tap interrupt = %x", flag);
 
 	GPIO_IntClear(flag);
 
 
 	gecko_external_signal(interrupt_flags_set); // Set gecko external event
+
+//	SLEEP_SleepBlockEnd(sleepEM3);
 }
