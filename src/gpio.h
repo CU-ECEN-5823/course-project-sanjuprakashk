@@ -43,6 +43,8 @@
 #define TAP_INT_MASK 	(1UL << 7)
 #define TAP_CONFIG_BUTTON (1UL << 8)
 
+int flag;
+
 
 void gpioInit();
 void gpioLed0SetOn();

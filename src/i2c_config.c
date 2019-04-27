@@ -2,6 +2,9 @@
 
 
 int timeout = 300000;
+
+I2C_TransferReturn_TypeDef result;
+
 /**
 --------------------------------------------------------------------------------------------
 i2c_init
@@ -24,12 +27,10 @@ int8_t i2c_init()
 	return 0;
 }
 
-I2C_TransferReturn_TypeDef result;
 int8_t i2c_transfer(uint16_t device_address, uint8_t cmd_array[], uint8_t data_array[], uint16_t data_length, uint8_t cmd_length, uint8_t flags)
 {
 	I2C_TransferSeq_TypeDef i2cTransfer;
 
-//	I2C_TransferReturn_TypeDef result;
 	i2cTransfer.addr          = device_address;
 	i2cTransfer.flags         = flags;
 	i2cTransfer.buf[0].data   = cmd_array;
@@ -88,6 +89,7 @@ int8_t i2c_write(uint8_t offset, uint8_t write_data)
 
 int8_t accel_config_freefall()
 {
+	//Set device in 50 Hz ODR, Standby
 	if(i2c_write(0x2A, 0x20) != 0)
 	{
 	  LOG_ERROR("Failed in putting device in standby mode\n");
@@ -100,24 +102,30 @@ int8_t accel_config_freefall()
 	  return -1;
 	}
 
+	// Setup configuration register
 	if(i2c_write(0x15, 0xB8) != 0)
 		return -1;
 
+	// Setting threshold to < 0.4g
 	if(i2c_write(0x17, 0x07) != 0)
 		return -1;
 
+	// Setup debounce count to 1
 	if(i2c_write(0x18, 0x01) != 0)
 		return -1;
 
+	//Enable freefall interrupt
 	if(i2c_read(0x2D, 1) != 0)
 		return -1;
 
 	int temp = data_array[0];
 	temp = 0x04;
 
+	//Enable freefall interrupt
 	if(i2c_write(0x2D, temp) != 0)
 		return -1;
 
+	//Route freefall interrupt to INT2 Pin
 	if(i2c_write(0x2E, 0x00) != 0)
 		return -1;
 
@@ -131,6 +139,7 @@ int8_t accel_config_freefall()
 
 	LOG_INFO("CNTRL REG = %x", temp);
 
+	// Put device in active mode
 	if(i2c_write(0x2A, temp) != 0)
 	{
 	  LOG_ERROR("Failed in putting device in active mode\n");
@@ -141,8 +150,7 @@ int8_t accel_config_freefall()
 
 int8_t accel_config_tap()
 {
-//	i2c_write(0x2A, 0x08); // Standby
-
+	//400 Hz, Standby Mode
 	if(i2c_write(0x2A, 0x08) != 0)
 	{
 	  LOG_ERROR("Failed in putting device in standby mode\n");
@@ -159,25 +167,28 @@ int8_t accel_config_tap()
 	if(i2c_write(0x21, 0x2A) != 0)
 		return -1;
 
+	// Set X Threshold
 	if(i2c_write(0x23, 0x15) != 0)
 		return -1;
 
+	// Set Y Threshold
 	if(i2c_write(0x24, 0x15) != 0)
 		return -1;
 
-
+	// Set Z Threshold
 	if(i2c_write(0x25, 0x2A) != 0)
 		return -1;
 
-
+	// Set time limit
 	if(i2c_write(0x26, 0x06) != 0)
 		return -1;
 
+	// Set latency time
 	if(i2c_write(0x27, 0x50) != 0)
 		return -1;
 
 
-
+	// Set time window
 	if(i2c_write(0x28, 0x78) != 0)
 		return -1;
 
@@ -185,8 +196,9 @@ int8_t accel_config_tap()
 		return -1;
 
 	int temp = data_array[0];
-	temp |= 0x08;
+	temp = 0x08;
 
+	// Setup interrupt
 	if(i2c_write(0x2D, temp) != 0) // Set INT 1
 		return -1;
 
@@ -194,8 +206,9 @@ int8_t accel_config_tap()
 		return -1;
 
 	temp = data_array[0];
-	temp |= 0x08;
+	temp = 0x08;
 
+	// Route interrupt to INT1 Pin
 	if(i2c_write(0x2E, temp) != 0)
 		return -1;
 
@@ -210,6 +223,7 @@ int8_t accel_config_tap()
 
 	LOG_INFO("CNTRL REG = %x", temp);
 
+	// Put device in active mode
 	if(i2c_write(0x2A, temp) != 0)
 	{
 		LOG_ERROR("Failed in putting device in active mode\n");

@@ -100,7 +100,7 @@ void interrupt_enable()
 
 void GPIO_EVEN_IRQHandler()
 {
-	int flag = GPIO_IntGet();
+	flag = GPIO_IntGet();
 
 	pin_state = GPIO_PinInGet(PB0_PORT, PB0_PIN);
 
@@ -126,7 +126,7 @@ void GPIO_EVEN_IRQHandler()
 void GPIO_ODD_IRQHandler()
 {
 	LOG_INFO("INSIDE INTERRUPT\n");
-	int flag = GPIO_IntGet();
+	flag = GPIO_IntGet();
 
 	LOG_INFO("INT FLAG = %d\n", flag);
 
