@@ -1,3 +1,11 @@
+/*
+ * File : i2c_config.c
+ *
+ *  Created on: Apr 13, 2019
+ *  Author: Sanju Prakash Kannioth
+ *  Reference: https://www.silabs.com/community/blog.entry.html/2016/03/09/chapter_10_2_contro-l8qA,
+ *  		   http://cache.freescale.com/files/sensors/doc/app_note/AN4070.pdf
+ */
 #include "i2c_config.h"
 
 
@@ -27,6 +35,17 @@ int8_t i2c_init()
 	return 0;
 }
 
+/**
+--------------------------------------------------------------------------------------------
+i2c_transfer
+--------------------------------------------------------------------------------------------
+*	This function works as the transfer function for the I2C
+*
+* 	@\param			device_address, cmd_array, data_array, data_length, cmd_length, flags
+*
+* 	@\return		0 on success
+*
+**/
 int8_t i2c_transfer(uint16_t device_address, uint8_t cmd_array[], uint8_t data_array[], uint16_t data_length, uint8_t cmd_length, uint8_t flags)
 {
 	I2C_TransferSeq_TypeDef i2cTransfer;
@@ -46,12 +65,27 @@ int8_t i2c_transfer(uint16_t device_address, uint8_t cmd_array[], uint8_t data_a
 	{
 		EMU_EnterEM1();
 	}
+
+	CORE_ATOMIC_IRQ_DISABLE();
 	sch_event.tx_done = 0;
+	CORE_ATOMIC_IRQ_ENABLE();
 
 	NVIC_DisableIRQ(I2C0_IRQn);
 	return 0;
 }
 
+/**
+--------------------------------------------------------------------------------------------
+i2c_read
+--------------------------------------------------------------------------------------------
+*	This function works as the read function for the I2C
+*
+* 	@\param			offset, data_len
+*
+* 	@\return		0 on success
+* 					-1 on failure
+*
+**/
 int8_t i2c_read(uint8_t offset, uint8_t data_len)
 {
 	cmd_array[0] = offset;
@@ -70,6 +104,18 @@ int8_t i2c_read(uint8_t offset, uint8_t data_len)
 
 }
 
+/**
+--------------------------------------------------------------------------------------------
+i2c_write
+--------------------------------------------------------------------------------------------
+*	This function works as the write function for the I2C
+*
+* 	@\param			offset, write_data
+*
+* 	@\return		0 on success
+* 					-1 on failure
+*
+**/
 int8_t i2c_write(uint8_t offset, uint8_t write_data)
 {
 	cmd_array[0] = offset;
@@ -87,6 +133,18 @@ int8_t i2c_write(uint8_t offset, uint8_t write_data)
 	}
 }
 
+/**
+--------------------------------------------------------------------------------------------
+accel_config_freefall
+--------------------------------------------------------------------------------------------
+*	This function works as the freefall configuration for MMA8452Q Accelerometer
+*
+* 	@\param			void
+*
+* 	@\return		0 on success
+* 					-1 on failure
+*
+**/
 int8_t accel_config_freefall()
 {
 	//Set device in 50 Hz ODR, Standby
@@ -148,6 +206,19 @@ int8_t accel_config_freefall()
 	return 0;
 }
 
+
+/**
+--------------------------------------------------------------------------------------------
+accel_config_tap
+--------------------------------------------------------------------------------------------
+*	This function works as the tap configuration for MMA8452Q Accelerometer
+*
+* 	@\param			void
+*
+* 	@\return		0 on success
+* 					-1 on failure
+*
+**/
 int8_t accel_config_tap()
 {
 	//400 Hz, Standby Mode
@@ -233,6 +304,17 @@ int8_t accel_config_tap()
 	return 0;
 }
 
+/**
+--------------------------------------------------------------------------------------------
+I2C0_IRQHandler
+--------------------------------------------------------------------------------------------
+*	This function works as the I2C0 IRQ Handler
+*
+* 	@\param			void
+*
+* 	@\return		void
+*
+**/
 void I2C0_IRQHandler(void)
 {
 	CORE_ATOMIC_IRQ_DISABLE();
@@ -242,15 +324,11 @@ void I2C0_IRQHandler(void)
 	if(result == i2cTransferDone)
 	{
 		sch_event.tx_done = 1; // Set I2C0 transfer complete event
-		LOG_INFO("result = %d\n", result);
-
 	}
 	else if(result != i2cTransferInProgress)
 	{
 		sch_event.tx_err = 1; // Set I2C0 transfer error event
 	}
-
-//	I2C_IntClear(I2C0, flag);
 
 	CORE_ATOMIC_IRQ_ENABLE();
 }

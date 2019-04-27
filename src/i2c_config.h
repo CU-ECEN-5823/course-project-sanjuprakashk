@@ -42,13 +42,75 @@ i2c_init
 **/
 int8_t i2c_init();
 
+/**
+--------------------------------------------------------------------------------------------
+i2c_transfer
+--------------------------------------------------------------------------------------------
+*	This function works as the transfer function for the I2C
+*
+* 	@\param			device_address, cmd_array, data_array, data_length, cmd_length, flags
+*
+* 	@\return		0 on success
+*
+**/
 int8_t i2c_transfer(uint16_t device_address, uint8_t cmd_array[], uint8_t data_array[], uint16_t data_length, uint8_t cmd_length, uint8_t flags);
 
+/**
+--------------------------------------------------------------------------------------------
+i2c_read
+--------------------------------------------------------------------------------------------
+*	This function works as the read function for the I2C
+*
+* 	@\param			offset, data_len
+*
+* 	@\return		0 on success
+* 					-1 on failure
+*
+**/
 int8_t i2c_read(uint8_t offset, uint8_t data_len);
 
+
+/**
+--------------------------------------------------------------------------------------------
+i2c_write
+--------------------------------------------------------------------------------------------
+*	This function works as the write function for the I2C
+*
+* 	@\param			offset, write_data
+*
+* 	@\return		0 on success
+* 					-1 on failure
+*
+**/
 int8_t i2c_write(uint8_t offset, uint8_t write_data);
 
+
+/**
+--------------------------------------------------------------------------------------------
+accel_config_freefall
+--------------------------------------------------------------------------------------------
+*	This function works as the freefall configuration for MMA8452Q Accelerometer
+*
+* 	@\param			void
+*
+* 	@\return		0 on success
+* 					-1 on failure
+*
+**/
 int8_t accel_config_freefall();
 
+
+/**
+--------------------------------------------------------------------------------------------
+accel_config_tap
+--------------------------------------------------------------------------------------------
+*	This function works as the tap configuration for MMA8452Q Accelerometer
+*
+* 	@\param			void
+*
+* 	@\return		0 on success
+* 					-1 on failure
+*
+**/
 int8_t accel_config_tap();
 #endif

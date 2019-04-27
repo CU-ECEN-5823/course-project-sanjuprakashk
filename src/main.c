@@ -1,41 +1,13 @@
-
-#include <stdbool.h>
-#include "letimer.h"
-#include "cmu_config.h"
-#include "display.h"
-#include "src/ble_mesh_device_type.h"
-#include "sleep.h"
-#include "em_emu.h"
-
-#include "init_mcu.h"
-#include "init_board.h"
-#include "gatt_db.h"
-#include <gecko_configuration.h>
-#include <mesh_sizes.h>
-
-#include "gpio.h"
-#include "log.h"
-#include "display.h"
-#include "letimer.h"
-#include "i2c_config.h"
-#include "persistent_storage.h"
-
-#include "mesh_generic_model_capi_types.h"
-
-#include "mesh_lib.h"
-
+/*
+ * File : main.c
+ *
+ *  Created on: Apr 13, 2019
+ *  Author: Sanju Prakash Kannioth
+ *  Reference: Silicon labs light switch example mesh implementation
+ */
 #include "main.h"
 
-#define TIMER_ID_FRIEND_FIND 20
-#define TIMER_ID_NODE_CONFIGURED  30
-#define TIMER_ID_PROVISIONING     66
-#define FACTORY_RESET_ID 78
-#define TIMER_RESTART_ID 77
-#define DISPLAY_REFRESH	79
 
-#define TIMER_CLK_FREQ ((uint32)32768)
-
-#define TIMER_MS_2_TIMERTICK(ms) ((TIMER_CLK_FREQ * ms) / 1000)
 
 uint32_t interrupt_flags_set;
 const int lowest_sleep_mode = 0; // Setting the lowest sleep mode
@@ -116,41 +88,19 @@ const gecko_configuration_t config =
 
 
 /**
- * See light switch app.c file definition
- */
-void gecko_bgapi_classes_init_server_friend(void)
-{
-	gecko_bgapi_class_dfu_init();
-	gecko_bgapi_class_system_init();
-	gecko_bgapi_class_le_gap_init();
-	gecko_bgapi_class_le_connection_init();
-	//gecko_bgapi_class_gatt_init();
-	gecko_bgapi_class_gatt_server_init();
-	gecko_bgapi_class_hardware_init();
-	gecko_bgapi_class_flash_init();
-	gecko_bgapi_class_test_init();
-	//gecko_bgapi_class_sm_init();
-	//mesh_native_bgapi_init();
-	gecko_bgapi_class_mesh_node_init();
-	//gecko_bgapi_class_mesh_prov_init();
-	gecko_bgapi_class_mesh_proxy_init();
-	gecko_bgapi_class_mesh_proxy_server_init();
-	//gecko_bgapi_class_mesh_proxy_client_init();
-	//gecko_bgapi_class_mesh_generic_client_init();
-	gecko_bgapi_class_mesh_generic_server_init();
-	//gecko_bgapi_class_mesh_vendor_model_init();
-	//gecko_bgapi_class_mesh_health_client_init();
-	//gecko_bgapi_class_mesh_health_server_init();
-	//gecko_bgapi_class_mesh_test_init();
-	gecko_bgapi_class_mesh_lpn_init();
-	//gecko_bgapi_class_mesh_friend_init();
-}
-
-
-/**
- * See main function list in soc-btmesh-switch project file
- */
-void gecko_bgapi_classes_init_client_lpn(void)
+--------------------------------------------------------------------------------------------
+gecko_bgapi_classes_init_server_lpn
+--------------------------------------------------------------------------------------------
+*	This function works as the initialization for lpn as server
+*
+* 	@\param			void
+*
+* 	@\return		void
+*
+* 	Reference : Function list in soc-btmesh-switch project file
+*
+**/
+void gecko_bgapi_classes_init_server_lpn(void)
 {
 	gecko_bgapi_class_dfu_init();
 	gecko_bgapi_class_system_init();
@@ -180,6 +130,21 @@ void gecko_bgapi_classes_init_client_lpn(void)
 	//gecko_bgapi_class_mesh_friend_init();
 
 }
+
+
+/**
+--------------------------------------------------------------------------------------------
+gecko_main_init
+--------------------------------------------------------------------------------------------
+*	This function works as the initialization for the board and mesh stack
+*
+* 	@\param			void
+*
+* 	@\return		void
+*
+* 	Reference : Function list in soc-btmesh-switch project file
+*
+**/
 void gecko_main_init()
 {
   // Initialize device
@@ -195,14 +160,26 @@ void gecko_main_init()
 
   gecko_stack_init(&config);
 
-  gecko_bgapi_classes_init_client_lpn();
+  gecko_bgapi_classes_init_server_lpn();
 
   // Initialize coexistence interface. Parameters are taken from HAL config.
   gecko_initCoexHAL();
 
 }
 
-
+/**
+--------------------------------------------------------------------------------------------
+lpn_init
+--------------------------------------------------------------------------------------------
+*	This function works as the initialization for lpn
+*
+* 	@\param			void
+*
+* 	@\return		void
+*
+* 	Reference : Function list in soc-btmesh-switch project file
+*
+**/
 void lpn_init(void)
 {
   uint16 result;
@@ -239,6 +216,20 @@ void lpn_init(void)
   }
 }
 
+
+/**
+--------------------------------------------------------------------------------------------
+lpn_deinit
+--------------------------------------------------------------------------------------------
+*	This function works as the de-initialization for lpn
+*
+* 	@\param			void
+*
+* 	@\return		void
+*
+* 	Reference : Function list in soc-btmesh-switch project file
+*
+**/
 void lpn_deinit(void)
 {
   uint16 result;
@@ -265,6 +256,19 @@ void lpn_deinit(void)
   LOG_INFO("LPN deinitialized\r\n");
  }
 
+
+/**
+--------------------------------------------------------------------------------------------
+set_device_name
+--------------------------------------------------------------------------------------------
+*	This function sets the device name string
+*
+* 	@\param			addr
+*
+* 	@\return		void
+*
+*
+**/
 void set_device_name(bd_addr *addr)
 {
 	char name[20];
@@ -278,7 +282,18 @@ void set_device_name(bd_addr *addr)
 	gecko_cmd_gatt_server_write_attribute_value(gattdb_device_name, 0, strlen(name), (uint8 *)name);
 }
 
-
+/**
+--------------------------------------------------------------------------------------------
+level_update_publish
+--------------------------------------------------------------------------------------------
+*	This function works as the level publish function
+*
+* 	@\param			button_state
+*
+* 	@\return		void
+*
+*
+**/
 void level_update_publish(int8_t button_state)
 {
 
@@ -286,20 +301,20 @@ void level_update_publish(int8_t button_state)
 	custom_pub.kind = mesh_generic_state_level;
 	custom_pub.level.level = button_state;
 
-	LOG_INFO("INSIDE PUBLISHER\n");
+	LOG_DEBUG("INSIDE PUBLISHER\n");
 	int result;
 
 	result = mesh_lib_generic_server_update(MESH_GENERIC_LEVEL_SERVER_MODEL_ID,	_elem_index, &custom_pub, 0,0);
 
-	LOG_INFO("RESULT = %d\n", result);
+	LOG_DEBUG("RESULT = %d\n", result);
 	if(result)
 	{
-		LOG_INFO("Error is publish update = %d\n", result);
+		LOG_ERROR("Error is publish update = %d\n", result);
 	}
 
 	else
 	{
-		LOG_INFO("INSIDE PUBLISHER 1\n");
+		LOG_DEBUG("INSIDE PUBLISHER 1\n");
 		result = mesh_lib_generic_server_publish(MESH_GENERIC_LEVEL_SERVER_MODEL_ID,
 														_elem_index,
 														mesh_generic_state_level);
@@ -310,12 +325,25 @@ void level_update_publish(int8_t button_state)
 		}
 		else
 		{
-			LOG_INFO("Publish success\n");
+			LOG_DEBUG("Publish success\n");
 		}
 	}
 
 }
 
+/**
+--------------------------------------------------------------------------------------------
+gecko_event_handler
+--------------------------------------------------------------------------------------------
+*	This function works as the event handler for the mesh stack
+*
+* 	@\param			evt_id, evt
+*
+* 	@\return		void
+*
+* 	Reference : Function list in soc-btmesh-switch project file
+*
+**/
 
 void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 {
@@ -323,7 +351,7 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
   uint8_t friend_data;
   switch (evt_id) {
     case gecko_evt_system_boot_id:
-      LOG_INFO("Booted\n");
+      LOG_DEBUG("Booted\n");
       displayPrintf(DISPLAY_ROW_NAME,"Low Power Node");
    	  displayPrintf(DISPLAY_ROW_BTADDR2,"Patient Monitor");
       if(GPIO_PinInGet(PB0_PORT, PB0_PIN ) == 0 || GPIO_PinInGet(PB1_PORT, PB1_PIN ) == 0)
@@ -342,7 +370,7 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
       {
     	  ps_load(PS_KEY_FALL_CONFIGURED, &is_fall_configured, sizeof(is_fall_configured));
     	  ps_load(PS_KEY_TAP_CONFIGURED, &is_tap_configured, sizeof(is_tap_configured));
-    	  ps_load(PS_KEY_BUTTON_STATE, &is_buzzer_on, sizeof(is_buzzer_on));
+    	  ps_load(PS_KEY_BUZZER_STATE, &is_buzzer_on, sizeof(is_buzzer_on));
 
     	  if(is_fall_configured)
     	  {
@@ -367,12 +395,12 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
     	  if(is_buzzer_on)
     	  {
     		  displayPrintf(DISPLAY_ROW_PASSKEY,"Buzzer ON");
-    		  LOG_INFO("BUZZER ON");
+    		  LOG_DEBUG("BUZZER ON");
     	  }
     	  else
     	  {
     		  displayPrintf(DISPLAY_ROW_PASSKEY,"Buzzer OFF");
-    		  LOG_INFO("BUZZER OFF\n");
+    		  LOG_DEBUG("BUZZER OFF\n");
     	  }
 
     	  LOG_INFO("FALL CONFIGURED? %d\n", is_fall_configured);
@@ -505,7 +533,7 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 		if(friend_data == 1)
 		{
 			is_buzzer_on = 0;
-			ps_save(PS_KEY_BUTTON_STATE, &is_buzzer_on, sizeof(is_buzzer_on));
+			ps_save(PS_KEY_BUZZER_STATE, &is_buzzer_on, sizeof(is_buzzer_on));
 			LOG_INFO("\nTURN ALARM OFF\n");
 			displayPrintf(DISPLAY_ROW_PASSKEY,"Buzzer OFF");
 		}
@@ -520,7 +548,7 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
     	break;
 
     case gecko_evt_le_connection_opened_id:
-    	LOG_INFO("Connected");
+    	LOG_DEBUG("Connected");
     	num_connections++;
 //    	lpn_deinit();
     	displayPrintf(DISPLAY_ROW_CONNECTION,"connected");
@@ -595,18 +623,18 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 			LOG_DEBUG("Display update call");
 		}
 
-    	if((evt->data.evt_system_external_signal.extsignals & BUTTON_INT_MASK) != 0)
+    	if((evt->data.evt_system_external_signal.extsignals & FALL_CONFIG_BUTTON) != 0)
 		{
 			CORE_AtomicDisableIrq();
-			interrupt_flags_set &= ~(BUTTON_INT_MASK); // Disable Button PB0 Interrupt bit mask
+			interrupt_flags_set &= ~(FALL_CONFIG_BUTTON); // Disable Button PB0 Interrupt bit mask
 			CORE_AtomicEnableIrq();
-
-			bool value = !pin_state;
 
 			if(accel_config_freefall() != 0)
 			{
 				LOG_ERROR("Failed in Initializing free fall mode\n");
 				is_fall_configured = 0;
+				displayPrintf(DISPLAY_ROW_CLIENTADDR,"PB1 - Tap config");
+				displayPrintf(DISPLAY_ROW_CONNECTION,"Fall configure failed");
 			}
 			else
 			{
@@ -617,7 +645,7 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 				displayPrintf(DISPLAY_ROW_CONNECTION,"Fall configured");
 			}
 
-			LOG_INFO("Fall Button state = %d\n",value);
+			LOG_DEBUG("Fall Button state = %d\n",value);
 			ps_save(PS_KEY_FALL_CONFIGURED, &is_fall_configured, sizeof(is_fall_configured));
 			ps_save(PS_KEY_TAP_CONFIGURED, &is_tap_configured, sizeof(is_tap_configured));
 		}
@@ -634,6 +662,8 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 			{
 			  LOG_ERROR("Failed in Initializing tap mode\n");
 			  is_tap_configured = 0;
+			  displayPrintf(DISPLAY_ROW_CLIENTADDR,"Tap configure failed");
+			  displayPrintf(DISPLAY_ROW_CONNECTION,"PB0 - Fall config");
 			}
 			else
 			{
@@ -644,7 +674,7 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 				displayPrintf(DISPLAY_ROW_CONNECTION,"PB0 - Fall config");
 			}
 
-			LOG_INFO("Tap Button state = %d\n",value);
+			LOG_DEBUG("Tap Button state = %d\n",value);
 			ps_save(PS_KEY_TAP_CONFIGURED, &is_tap_configured, sizeof(is_tap_configured));
 			ps_save(PS_KEY_FALL_CONFIGURED, &is_fall_configured, sizeof(is_fall_configured));
     	}
@@ -657,7 +687,7 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 			bool value = fall_state;
 
-			LOG_INFO("Fall state = %d\n",value);
+			LOG_DEBUG("Fall state = %d\n",value);
 
 
 			i2c_read(0x16, 1);
@@ -676,7 +706,7 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 			bool value = tap_state;
 
-			LOG_INFO("Tap state = %d\n",value);
+			LOG_DEBUG("Tap state = %d\n",value);
 
 			i2c_read(0X22,1);
 
@@ -711,12 +741,6 @@ int main(void)
   gecko_main_init();
 
   logInit();
-
-//  // Initialize CMU
-//  cmu_Init();
-//
-//  //Initialize LETIMER0
-//  LETIMER0_init();
 
   displayInit();
 

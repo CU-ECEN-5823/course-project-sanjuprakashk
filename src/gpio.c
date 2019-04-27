@@ -104,16 +104,9 @@ void GPIO_EVEN_IRQHandler()
 
 	pin_state = GPIO_PinInGet(PB0_PORT, PB0_PIN);
 
-	if(!pin_state)
-	{
-		pin_pressed_flag = 1;
-		LOG_DEBUG("State of pin pressed flag in interrupt = %d", pin_pressed_flag);
-	}
-
-	LOG_INFO("BUTTON FLAG = %d\n",flag);
 	LOG_DEBUG("State of pin in interrupt = %d", pin_state);
 
-	interrupt_flags_set |= BUTTON_INT_MASK;
+	interrupt_flags_set |= FALL_CONFIG_BUTTON;
 
 
 	GPIO_IntClear(flag);
@@ -125,24 +118,16 @@ void GPIO_EVEN_IRQHandler()
 
 void GPIO_ODD_IRQHandler()
 {
-	LOG_INFO("INSIDE INTERRUPT\n");
+	LOG_DEBUG("INSIDE INTERRUPT\n");
 	flag = GPIO_IntGet();
 
-	LOG_INFO("INT FLAG = %d\n", flag);
+	LOG_DEBUG("INT FLAG = %d\n", flag);
 
-	if(flag == 0x200) // Fall flag set
-	{
-		fall_state = GPIO_PinInGet(GPIO_FALL_INT_PORT, GPIO_FALL_INT_PIN);
-
-		LOG_INFO("State of fall in interrupt = %d", fall_state);
-
-		interrupt_flags_set |= FALL_INT_MASK;
-	}
 	if(flag == 0x80) // Tap config button
 	{
 		tap_config_button = GPIO_PinInGet(PB1_PORT, PB1_PIN);
 
-		LOG_INFO("Configure tap detection\n");
+		LOG_DEBUG("Configure tap detection\n");
 
 		interrupt_flags_set |= TAP_CONFIG_BUTTON;
 
@@ -151,9 +136,18 @@ void GPIO_ODD_IRQHandler()
 	{
 		tap_state = GPIO_PinInGet(GPIO_TAP_INT_PORT, GPIO_TAP_INT_PIN);
 
-		LOG_INFO("State of tap gpio in interrupt = %d", tap_state);
+		LOG_DEBUG("State of tap gpio in interrupt = %d", tap_state);
 
 		interrupt_flags_set |= TAP_INT_MASK;
+	}
+
+	if(flag == 0x200) // Fall flag set
+	{
+		fall_state = GPIO_PinInGet(GPIO_FALL_INT_PORT, GPIO_FALL_INT_PIN);
+
+		LOG_DEBUG("State of fall in interrupt = %d", fall_state);
+
+		interrupt_flags_set |= FALL_INT_MASK;
 	}
 
 	GPIO_IntClear(flag);
