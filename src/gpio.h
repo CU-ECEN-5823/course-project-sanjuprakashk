@@ -29,11 +29,11 @@
 #define PC7_PIN		7
 
 
-#define GPIO_TAP_INT_PORT	gpioPortC
-#define GPIO_TAP_INT_PIN	9
+#define GPIO_TAP_INT_PORT	gpioPortF
+#define GPIO_TAP_INT_PIN	3
 
 #define GPIO_FALL_INT_PORT	gpioPortC
-#define GPIO_FALL_INT_PIN	7
+#define GPIO_FALL_INT_PIN	9
 
 #define GPIO_DISPLAY_SUPPORT_IMPLEMENTED 1
 #define GPIO_SET_DISPLAY_EXT_COMIN_IMPLEMENTED 1
@@ -41,6 +41,7 @@
 #define BUTTON_INT_MASK (1UL << 5)
 #define FALL_INT_MASK	(1UL << 6)
 #define TAP_INT_MASK 	(1UL << 7)
+#define TAP_CONFIG_BUTTON (1UL << 8)
 
 
 void gpioInit();

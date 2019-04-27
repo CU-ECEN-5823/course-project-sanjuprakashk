@@ -17,17 +17,20 @@
 #include "display.h"
 #include "letimer.h"
 #include "i2c_config.h"
+#include "persistent_storage.h"
 
 #include "mesh_generic_model_capi_types.h"
 
 #include "mesh_lib.h"
 
+#include "main.h"
 
-#define FACTORY_RESET_ID 78
-#define TIMER_RESTART_ID 77
 #define TIMER_ID_FRIEND_FIND 20
 #define TIMER_ID_NODE_CONFIGURED  30
 #define TIMER_ID_PROVISIONING     66
+#define FACTORY_RESET_ID 78
+#define TIMER_RESTART_ID 77
+#define DISPLAY_REFRESH	79
 
 #define TIMER_CLK_FREQ ((uint32)32768)
 
@@ -39,11 +42,15 @@ uint8_t pin_state = 1; // Variable to read PB0 button state
 uint8_t fall_state;
 uint8_t tap_state;
 
+uint8_t tap_config_button;
+
 static uint8 num_connections = 0;
 
 volatile uint8_t pin_pressed_flag = 0;
 
 bool mesh_bgapi_listener(struct gecko_cmd_packet *evt);
+
+
 
 
 
@@ -86,6 +93,7 @@ static uint16 _elem_index = 0xffff;
 
 const gecko_configuration_t config =
 {
+  .sleep.flags = SLEEP_FLAGS_DEEP_SLEEP_ENABLE,
   .bluetooth.max_connections = MAX_CONNECTIONS,
   .bluetooth.max_advertisers = MAX_ADVERTISERS,
   .bluetooth.heap = bluetooth_stack_heap,
@@ -277,17 +285,20 @@ void level_update_publish(int8_t button_state)
 	custom_pub.kind = mesh_generic_state_level;
 	custom_pub.level.level = button_state;
 
+	LOG_INFO("INSIDE PUBLISHER\n");
 	int result;
 
 	result = mesh_lib_generic_server_update(MESH_GENERIC_LEVEL_SERVER_MODEL_ID,	_elem_index, &custom_pub, 0,0);
 
+	LOG_INFO("RESULT = %d\n", result);
 	if(result)
 	{
-		LOG_ERROR("Error is publish update\n");
+		LOG_INFO("Error is publish update = %d\n", result);
 	}
 
 	else
 	{
+		LOG_INFO("INSIDE PUBLISHER 1\n");
 		result = mesh_lib_generic_server_publish(MESH_GENERIC_LEVEL_SERVER_MODEL_ID,
 														_elem_index,
 														mesh_generic_state_level);
@@ -311,7 +322,7 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
   uint8_t friend_data;
   switch (evt_id) {
     case gecko_evt_system_boot_id:
-    	LOG_INFO("Booted\n");
+      LOG_INFO("Booted\n");
       if(GPIO_PinInGet(PB0_PORT, PB0_PIN ) == 0 || GPIO_PinInGet(PB1_PORT, PB1_PIN ) == 0)
       {
     	  // Erase persistent storage
@@ -326,6 +337,31 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
       else
       {
+    	  ps_load(PS_KEY_FALL_CONFIGURED, &is_fall_configured, sizeof(is_fall_configured));
+    	  ps_load(PS_KEY_TAP_CONFIGURED, &is_tap_configured, sizeof(is_tap_configured));
+    	  ps_load(PS_KEY_BUTTON_STATE, &is_button_on, sizeof(is_button_on));
+
+    	  if(is_fall_configured)
+    	  {
+    		  accel_config_freefall();
+    	  }
+
+    	  if(is_tap_configured)
+    	  {
+    		  accel_config_tap();
+    	  }
+
+    	  if(is_button_on)
+    	  {
+    		  LOG_INFO("BUZZER ON");
+    	  }
+
+    	  LOG_INFO("FALL CONFIGURED? %d\n", is_fall_configured);
+
+    	  LOG_INFO("TAP CONFIGURED? %d\n", is_tap_configured);
+
+    	  LOG_INFO("BUTTON STATE? %d\n", is_button_on);
+
     	  struct gecko_msg_system_get_bt_address_rsp_t *gecko_bt_addr = gecko_cmd_system_get_bt_address();
 
     	  gecko_bt_addr = gecko_cmd_system_get_bt_address();
@@ -378,6 +414,10 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 			lpn_init();
 			}
 			break;
+    	case DISPLAY_REFRESH:
+    		timer_count+=1;
+    		displayUpdate();
+    		break;
     	}
     	break;
 
@@ -402,7 +442,7 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
       {
     	  _elem_index = 0;
 
-    	  mesh_lib_init(malloc, free, 8);
+    	  mesh_lib_init(malloc, free, 10);
     	  lpn_init();
 
     	  displayPrintf(DISPLAY_ROW_ACTION,"provisioned");
@@ -424,7 +464,7 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
     	_elem_index = 0;
 
-    	mesh_lib_init(malloc, free, 8);
+    	mesh_lib_init(malloc, free, 10);
 
     	LOG_INFO("provisioned\n");
 
@@ -445,6 +485,8 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 		if(friend_data == 1)
 		{
+			is_button_on = 0;
+			ps_save(PS_KEY_BUTTON_STATE, &is_button_on, sizeof(is_button_on));
 			LOG_INFO("\nTURN ALARM OFF\n");
 		}
 //    		mesh_lib_generic_server_event_handler(evt);
@@ -538,14 +580,51 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 			bool value = !pin_state;
 
-//			i2c_read(0X00,1);
+			if(accel_config_freefall() != 0)
+			{
+				LOG_ERROR("Failed in Initializing free fall mode\n");
+				is_fall_configured = 0;
+			}
+			else
+			{
+				is_fall_configured = 1;
+				is_button_on = 1;
+				is_tap_configured =0;
+			}
 
-			LOG_INFO("Button state = %d\n",value);
-
-			level_update_publish(value + 10);
+			LOG_INFO("Fall Button state = %d\n",value);
+			ps_save(PS_KEY_FALL_CONFIGURED, &is_fall_configured, sizeof(is_fall_configured));
+			ps_save(PS_KEY_BUTTON_STATE, &is_button_on, sizeof(is_button_on));
+			ps_save(PS_KEY_TAP_CONFIGURED, &is_tap_configured, sizeof(is_tap_configured));
 		}
 
-    	if((evt->data.evt_system_external_signal.extsignals & FALL_INT_MASK) != 0)
+    	if((evt->data.evt_system_external_signal.extsignals & TAP_CONFIG_BUTTON) != 0)
+		{
+			CORE_AtomicDisableIrq();
+			interrupt_flags_set &= ~(TAP_CONFIG_BUTTON); // Disable Button PB0 Interrupt bit mask
+			CORE_AtomicEnableIrq();
+
+			bool value = !tap_config_button;
+
+			if(accel_config_tap() != 0)
+			{
+			  LOG_ERROR("Failed in Initializing tap mode\n");
+			  is_tap_configured = 0;
+			}
+			else
+			{
+				is_tap_configured = 1;
+				is_button_on = 1;
+				is_fall_configured = 0;
+			}
+
+			LOG_INFO("Tap Button state = %d\n",value);
+			ps_save(PS_KEY_TAP_CONFIGURED, &is_tap_configured, sizeof(is_tap_configured));
+			ps_save(PS_KEY_BUTTON_STATE, &is_button_on, sizeof(is_button_on));
+			ps_save(PS_KEY_FALL_CONFIGURED, &is_fall_configured, sizeof(is_fall_configured));
+    	}
+
+    	if((evt->data.evt_system_external_signal.extsignals & FALL_INT_MASK) && (is_fall_configured) != 0)
 		{
 			CORE_AtomicDisableIrq();
 			interrupt_flags_set &= ~(FALL_INT_MASK); // Disable Fall Interrupt bit mask
@@ -555,15 +634,13 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 			LOG_INFO("Fall state = %d\n",value);
 
-//			i2c_read(0X16,1);
-
-			LOG_INFO("READ RESULT = %x\n", data_array[0]);
+			i2c_read(0x16, 1);
 
 			level_update_publish(40);
 
 		}
 
-    	if((evt->data.evt_system_external_signal.extsignals & TAP_INT_MASK) != 0)
+    	if((evt->data.evt_system_external_signal.extsignals & TAP_INT_MASK) && (is_tap_configured) != 0)
 		{
 			CORE_AtomicDisableIrq();
 			interrupt_flags_set &= ~(TAP_INT_MASK); // Disable Fall Interrupt bit mask
@@ -573,9 +650,7 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 			LOG_INFO("Tap state = %d\n",value);
 
-//			i2c_read(0X16,1);
-
-			LOG_INFO("READ RESULT = %x\n", data_array[0]);
+			i2c_read(0X22,1);
 
 			level_update_publish(41);
 
@@ -607,16 +682,17 @@ int main(void)
 
   logInit();
 
-  // Initialize CMU
-  cmu_Init();
-
-  //Initialize LETIMER0
-  LETIMER0_init();
+//  // Initialize CMU
+//  cmu_Init();
+//
+//  //Initialize LETIMER0
+//  LETIMER0_init();
 
   displayInit();
 
   gpioInit();
 
+  gecko_cmd_hardware_set_soft_timer(1 * 32768, DISPLAY_REFRESH, 0);
 
   if(i2c_init() != 0)
   {
@@ -624,39 +700,7 @@ int main(void)
 	  return -1;
   }
 
-  if(i2c_write(0x2A, 0x20) != 0)
-  {
-	  LOG_ERROR("Failed in putting device in standby mode\n");
-  }
 
-  if(accel_config_freefall() != 0)
-  {
-	  LOG_ERROR("Failed in Initializing free fall mode\n");
-  }
-
-  if(accel_config_tap() != 0)
-  {
-	  LOG_ERROR("Failed in Initializing tap mode\n");
-  }
-
-
-  if(i2c_read(0x2A, 1) != 0)
-  {
-	  LOG_ERROR("Failed in Read\n");
-  }
-
-  int temp = data_array[0];
-  temp |= 0x01;
-
-  LOG_DEBUG("CNTRL REG = %x", temp);
-
-  if(i2c_write(0x2A, temp) != 0)
-  {
-	  LOG_ERROR("Failed in putting device in active mode\n");
-  }
-
-
- /* Infinite loop */
   while (1) {
 	struct gecko_cmd_packet *evt = gecko_wait_event();
 	bool pass = mesh_bgapi_listener(evt);

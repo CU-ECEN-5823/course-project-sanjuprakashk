@@ -19,6 +19,7 @@
 extern uint8_t pin_state;
 extern uint8_t fall_state;
 extern uint8_t tap_state;
+extern uint8_t tap_config_button;
 
 extern volatile uint8_t pin_pressed_flag;
 extern uint32_t interrupt_flags_set;
@@ -88,9 +89,13 @@ void PB0_interrupt_enable()
 
 	GPIO_IntEnable(1<<GPIO_FALL_INT_PIN);
 
-	GPIO_IntConfig(PB0_PORT, PB0_PIN, true, true, true); // Enable GPIO interrupt
+	GPIO_IntConfig(PB0_PORT, PB0_PIN, true, false, true); // Enable GPIO interrupt
 
 	GPIO_IntEnable(1<<PB0_PIN);
+
+	GPIO_IntConfig(PB1_PORT, PB1_PIN, true, false, true); // Enable GPIO interrupt
+
+	GPIO_IntEnable(1<<PB1_PIN);
 }
 
 void GPIO_EVEN_IRQHandler()
@@ -105,7 +110,8 @@ void GPIO_EVEN_IRQHandler()
 		LOG_DEBUG("State of pin pressed flag in interrupt = %d", pin_pressed_flag);
 	}
 
-	LOG_DEGUB("State of pin in interrupt = %d", pin_state);
+	LOG_INFO("BUTTON FLAG = %d\n",flag);
+	LOG_DEBUG("State of pin in interrupt = %d", pin_state);
 
 	interrupt_flags_set |= BUTTON_INT_MASK;
 
@@ -119,43 +125,39 @@ void GPIO_EVEN_IRQHandler()
 
 void GPIO_ODD_IRQHandler()
 {
-//	SLEEP_SleepBlockEnd(sleepEM3);
-
-	LOG_DEBUG("INSIDE INTERRUPT");
+	LOG_INFO("INSIDE INTERRUPT\n");
 	int flag = GPIO_IntGet();
 
-	LOG_DEBUG("INT FLAG = %d\n", flag);
+	LOG_INFO("INT FLAG = %d\n", flag);
 
-	if(flag == 0x80) // Fall flag set
-	{
-		tap_state = GPIO_PinInGet(GPIO_TAP_INT_PORT, GPIO_TAP_INT_PIN);
-
-		i2c_read(0x22, 1);
-
-//		i2c_read(0x16, 1);
-
-		LOG_DEBUG("State of tap gpio in interrupt = %d", tap_state);
-
-		interrupt_flags_set |= TAP_INT_MASK;
-	}
-	if(flag == 0x200) // Tap flag set
+	if(flag == 0x200) // Fall flag set
 	{
 		fall_state = GPIO_PinInGet(GPIO_FALL_INT_PORT, GPIO_FALL_INT_PIN);
 
-//		i2c_read(0x22, 1);
-
-		i2c_read(0x16, 1);
-
-		LOG_DEBUG("State of fall gpio in interrupt = %d", fall_state);
+		LOG_INFO("State of fall in interrupt = %d", fall_state);
 
 		interrupt_flags_set |= FALL_INT_MASK;
+	}
+	if(flag == 0x80) // Tap config button
+	{
+		tap_config_button = GPIO_PinInGet(PB1_PORT, PB1_PIN);
 
+		LOG_INFO("Configure tap detection\n");
+
+		interrupt_flags_set |= TAP_CONFIG_BUTTON;
+
+	}
+	if(flag == 0x08) // Tap flag set
+	{
+		tap_state = GPIO_PinInGet(GPIO_TAP_INT_PORT, GPIO_TAP_INT_PIN);
+
+		LOG_INFO("State of tap gpio in interrupt = %d", tap_state);
+
+		interrupt_flags_set |= TAP_INT_MASK;
 	}
 
 	GPIO_IntClear(flag);
 
 
 	gecko_external_signal(interrupt_flags_set); // Set gecko external event
-
-//	SLEEP_SleepBlockEnd(sleepEM3);
 }

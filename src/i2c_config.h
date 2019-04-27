@@ -13,8 +13,10 @@
 #include "i2cspm.h"
 #include <stdlib.h>
 #include "log.h"
+#include "main.h"
 #include "em_i2c.h"
 #include "em_core.h"
+#include "em_emu.h"
 
 #define ACCEL_SENSOR 0x1D << 1
 
