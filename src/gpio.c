@@ -77,7 +77,7 @@ void gpioSetDisplayExtcomin(bool high)
 	}
 }
 
-void PB0_interrupt_enable()
+void interrupt_enable()
 {
 	GPIOINT_Init();
 

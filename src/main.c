@@ -323,6 +323,8 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
   switch (evt_id) {
     case gecko_evt_system_boot_id:
       LOG_INFO("Booted\n");
+      displayPrintf(DISPLAY_ROW_NAME,"Low Power Node");
+   	  displayPrintf(DISPLAY_ROW_BTADDR2,"Patient Monitor");
       if(GPIO_PinInGet(PB0_PORT, PB0_PIN ) == 0 || GPIO_PinInGet(PB1_PORT, PB1_PIN ) == 0)
       {
     	  // Erase persistent storage
@@ -339,28 +341,44 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
       {
     	  ps_load(PS_KEY_FALL_CONFIGURED, &is_fall_configured, sizeof(is_fall_configured));
     	  ps_load(PS_KEY_TAP_CONFIGURED, &is_tap_configured, sizeof(is_tap_configured));
-    	  ps_load(PS_KEY_BUTTON_STATE, &is_button_on, sizeof(is_button_on));
+    	  ps_load(PS_KEY_BUTTON_STATE, &is_buzzer_on, sizeof(is_buzzer_on));
 
     	  if(is_fall_configured)
     	  {
     		  accel_config_freefall();
+    		  displayPrintf(DISPLAY_ROW_CONNECTION,"Fall configured");
+    	  }
+    	  else
+    	  {
+    		  displayPrintf(DISPLAY_ROW_CONNECTION,"PB0 - Fall config ");
     	  }
 
     	  if(is_tap_configured)
     	  {
     		  accel_config_tap();
+    		  displayPrintf(DISPLAY_ROW_CLIENTADDR,"Tap configured");
+    	  }
+    	  else
+    	  {
+    		  displayPrintf(DISPLAY_ROW_CLIENTADDR,"PB1 - Tap config");
     	  }
 
-    	  if(is_button_on)
+    	  if(is_buzzer_on)
     	  {
+    		  displayPrintf(DISPLAY_ROW_PASSKEY,"Buzzer ON");
     		  LOG_INFO("BUZZER ON");
+    	  }
+    	  else
+    	  {
+    		  displayPrintf(DISPLAY_ROW_PASSKEY,"Buzzer OFF");
+    		  LOG_INFO("BUZZER OFF\n");
     	  }
 
     	  LOG_INFO("FALL CONFIGURED? %d\n", is_fall_configured);
 
     	  LOG_INFO("TAP CONFIGURED? %d\n", is_tap_configured);
 
-    	  LOG_INFO("BUTTON STATE? %d\n", is_button_on);
+    	  LOG_INFO("BUTTON STATE? %d\n", is_buzzer_on);
 
     	  struct gecko_msg_system_get_bt_address_rsp_t *gecko_bt_addr = gecko_cmd_system_get_bt_address();
 
@@ -447,7 +465,7 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
     	  displayPrintf(DISPLAY_ROW_ACTION,"provisioned");
 
-    	  PB0_interrupt_enable();
+    	  interrupt_enable();
 
       }
 
@@ -485,9 +503,10 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 		if(friend_data == 1)
 		{
-			is_button_on = 0;
-			ps_save(PS_KEY_BUTTON_STATE, &is_button_on, sizeof(is_button_on));
+			is_buzzer_on = 0;
+			ps_save(PS_KEY_BUTTON_STATE, &is_buzzer_on, sizeof(is_buzzer_on));
 			LOG_INFO("\nTURN ALARM OFF\n");
+			displayPrintf(DISPLAY_ROW_PASSKEY,"Buzzer OFF");
 		}
 //    		mesh_lib_generic_server_event_handler(evt);
 
@@ -536,10 +555,12 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
     case gecko_evt_mesh_lpn_friendship_established_id:
           LOG_INFO("friendship established\r\n");
+          displayPrintf(DISPLAY_ROW_ACTION,"Friend Established");
       break;
 
     case gecko_evt_mesh_lpn_friendship_failed_id:
 	  LOG_ERROR("friendship failed\r\n");
+	  displayPrintf(DISPLAY_ROW_ACTION,"Friendship Failed");
 	  // try again in 2 seconds
 	  result = gecko_cmd_hardware_set_soft_timer(TIMER_MS_2_TIMERTICK(2000),
 												 TIMER_ID_FRIEND_FIND,
@@ -551,6 +572,7 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 	case gecko_evt_mesh_lpn_friendship_terminated_id:
 	  LOG_INFO("friendship terminated\r\n");
+	  displayPrintf(DISPLAY_ROW_ACTION,"Friend Terminated");
 	  if (num_connections == 0) {
 		// try again in 2 seconds
 		result = gecko_cmd_hardware_set_soft_timer(TIMER_MS_2_TIMERTICK(2000),
@@ -588,13 +610,14 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 			else
 			{
 				is_fall_configured = 1;
-				is_button_on = 1;
 				is_tap_configured =0;
+
+				displayPrintf(DISPLAY_ROW_CLIENTADDR,"PB1 - Tap config");
+				displayPrintf(DISPLAY_ROW_CONNECTION,"Fall configured");
 			}
 
 			LOG_INFO("Fall Button state = %d\n",value);
 			ps_save(PS_KEY_FALL_CONFIGURED, &is_fall_configured, sizeof(is_fall_configured));
-			ps_save(PS_KEY_BUTTON_STATE, &is_button_on, sizeof(is_button_on));
 			ps_save(PS_KEY_TAP_CONFIGURED, &is_tap_configured, sizeof(is_tap_configured));
 		}
 
@@ -614,13 +637,14 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 			else
 			{
 				is_tap_configured = 1;
-				is_button_on = 1;
 				is_fall_configured = 0;
+
+				displayPrintf(DISPLAY_ROW_CLIENTADDR,"Tap configured");
+				displayPrintf(DISPLAY_ROW_CONNECTION,"PB0 - Fall config");
 			}
 
 			LOG_INFO("Tap Button state = %d\n",value);
 			ps_save(PS_KEY_TAP_CONFIGURED, &is_tap_configured, sizeof(is_tap_configured));
-			ps_save(PS_KEY_BUTTON_STATE, &is_button_on, sizeof(is_button_on));
 			ps_save(PS_KEY_FALL_CONFIGURED, &is_fall_configured, sizeof(is_fall_configured));
     	}
 
@@ -634,7 +658,10 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 			LOG_INFO("Fall state = %d\n",value);
 
+
 			i2c_read(0x16, 1);
+
+			displayPrintf(DISPLAY_ROW_PASSKEY,"Buzzer ON");
 
 			level_update_publish(40);
 
@@ -651,6 +678,8 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 			LOG_INFO("Tap state = %d\n",value);
 
 			i2c_read(0X22,1);
+
+			displayPrintf(DISPLAY_ROW_PASSKEY,"Buzzer ON");
 
 			level_update_publish(41);
 

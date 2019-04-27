@@ -51,5 +51,5 @@ void gpioLed1SetOn();
 void gpioLed1SetOff();
 void gpioEnableDisplay();
 void gpioSetDisplayExtcomin(bool high);
-void PB0_interrupt_enable();
+void interrupt_enable();
 #endif /* SRC_GPIO_H_ */

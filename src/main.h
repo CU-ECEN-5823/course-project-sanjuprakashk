@@ -40,6 +40,6 @@ typedef enum  {
 
  uint8_t is_tap_configured;
  uint8_t is_fall_configured;
- uint8_t is_button_on;
+ uint8_t is_buzzer_on;
 
  #endif
