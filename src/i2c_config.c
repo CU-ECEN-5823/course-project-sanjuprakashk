@@ -9,7 +9,7 @@
 #include "i2c_config.h"
 
 
-int timeout = 300000;
+int timeout = 30000;
 
 I2C_TransferReturn_TypeDef result;
 
@@ -49,7 +49,6 @@ i2c_transfer
 int8_t i2c_transfer(uint16_t device_address, uint8_t cmd_array[], uint8_t data_array[], uint16_t data_length, uint8_t cmd_length, uint8_t flags)
 {
 
-	int i, j;
 	I2C_TransferSeq_TypeDef i2cTransfer;
 
 	i2cTransfer.addr          = device_address;
@@ -61,22 +60,21 @@ int8_t i2c_transfer(uint16_t device_address, uint8_t cmd_array[], uint8_t data_a
 	i2cTransfer.buf[1].len    = data_length;
 
 	NVIC_EnableIRQ(I2C0_IRQn);
+
 	result = I2C_TransferInit(I2C0, &i2cTransfer);
-	while (!sch_event.tx_done && timeout--)
+	while (!sch_event.tx_done && timeout != 0)
 	{
-		EMU_EnterEM1();
+		timeout--;
 	}
 
-	LOG_INFO("I = %d\t J = %d\n",i,j);
 
+	LOG_INFO("SLEEP MODE : %d\n",SLEEP_LowestEnergyModeGet());
 
 	CORE_ATOMIC_IRQ_DISABLE();
 	sch_event.tx_done = 0;
 	CORE_ATOMIC_IRQ_ENABLE();
 
 	NVIC_DisableIRQ(I2C0_IRQn);
-
-//	SLEEP_Sleep();
 
 	return 0;
 }

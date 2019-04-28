@@ -37,6 +37,7 @@
 #include "mesh_generic_model_capi_types.h"
 
 #include "mesh_lib.h"
+#include "gecko_ble_errors.h"
 
 /*
  *  		MACROS

@@ -23,10 +23,6 @@ volatile uint8_t pin_pressed_flag = 0;
 
 bool mesh_bgapi_listener(struct gecko_cmd_packet *evt);
 
-
-
-
-
 // bluetooth stack heap
 #define MAX_CONNECTIONS 2
 
@@ -361,62 +357,18 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
    	  if(GPIO_PinInGet(PB0_PORT, PB0_PIN ) == 0 || GPIO_PinInGet(PB1_PORT, PB1_PIN ) == 0) //Factory reset condition
       {
     	  // Erase persistent storage
-    	  gecko_cmd_flash_ps_erase_all();
+   		  BTSTACK_CHECK_RESPONSE(gecko_cmd_flash_ps_erase_all());
 
     	  LOG_INFO("Factory Reset\n");
 
     	  displayPrintf(DISPLAY_ROW_ACTION,"Factory Reset");
 
     	  // Wait for 2 seconds
-    	  gecko_cmd_hardware_set_soft_timer(2 * 32768, FACTORY_RESET_ID, 1);
+    	  BTSTACK_CHECK_RESPONSE(gecko_cmd_hardware_set_soft_timer(2 * 32768, FACTORY_RESET_ID, 1));
       }
 
       else
       {
-    	  ps_load(PS_KEY_FALL_CONFIGURED, &is_fall_configured, sizeof(is_fall_configured));
-    	  ps_load(PS_KEY_TAP_CONFIGURED, &is_tap_configured, sizeof(is_tap_configured));
-    	  ps_load(PS_KEY_BUZZER_STATE, &is_buzzer_on, sizeof(is_buzzer_on));
-
-    	  // Check persistent storage on boot up to enable required modes
-    	  if(is_fall_configured)
-    	  {
-    		  accel_config_freefall();
-    		  displayPrintf(DISPLAY_ROW_CONNECTION,"Fall configured");
-    	  }
-    	  else
-    	  {
-    		  displayPrintf(DISPLAY_ROW_CONNECTION,"PB0 - Fall config ");
-    	  }
-
-    	  if(is_tap_configured)
-    	  {
-    		  accel_config_tap();
-    		  displayPrintf(DISPLAY_ROW_CLIENTADDR,"Tap configured");
-    	  }
-    	  else
-    	  {
-    		  displayPrintf(DISPLAY_ROW_CLIENTADDR,"PB1 - Tap config");
-    	  }
-
-    	  if(is_buzzer_on)
-    	  {
-    		  displayPrintf(DISPLAY_ROW_PASSKEY,"Buzzer ON");
-    		  gpioLed1SetOn();
-    		  LOG_DEBUG("BUZZER ON");
-    	  }
-    	  else
-    	  {
-    		  displayPrintf(DISPLAY_ROW_PASSKEY,"Buzzer OFF");
-    		  LOG_DEBUG("BUZZER OFF\n");
-    		  gpioLed1SetOff();
-    	  }
-
-    	  LOG_INFO("FALL CONFIGURED = %d\n", is_fall_configured);
-
-    	  LOG_INFO("TAP CONFIGURED = %d\n", is_tap_configured);
-
-    	  LOG_INFO("BUTTON STATE = %d\n", is_buzzer_on);
-
     	  struct gecko_msg_system_get_bt_address_rsp_t *gecko_bt_addr = gecko_cmd_system_get_bt_address();
 
     	  gecko_bt_addr = gecko_cmd_system_get_bt_address();
@@ -497,6 +449,71 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
       if(evt->data.evt_mesh_node_initialized.provisioned)
       {
+    	  // Load data from persistent storage
+    	  if(ps_load(PS_KEY_FALL_CONFIGURED, &is_fall_configured, sizeof(is_fall_configured)) == 0)
+    	  {
+    		  LOG_DEBUG("PS LOAD of fall config loaded successfully\n");
+    	  }
+    	  else
+    	  {
+    		  LOG_DEBUG("PS LOAD of fall config load failed\n");
+    	  }
+		  if(ps_load(PS_KEY_TAP_CONFIGURED, &is_tap_configured, sizeof(is_tap_configured)) == 0)
+		  {
+			  LOG_DEBUG("PS LOAD of tap config loaded successfully\n");
+		  }
+		  else
+		  {
+			  LOG_DEBUG("PS LOAD of tap config load failed\n");
+		  }
+		  if(ps_load(PS_KEY_BUZZER_STATE, &is_buzzer_on, sizeof(is_buzzer_on)) == 0)
+		  {
+			  LOG_DEBUG("PS LOAD of buzzer state loaded successfully\n");
+		  }
+		  else
+		  {
+			  LOG_DEBUG("PS LOAD of buzzer state load failed\n");
+		  }
+
+		  // Check persistent storage on provisioning to enable required modes
+		  if(is_fall_configured)
+		  {
+			  accel_config_freefall();
+			  displayPrintf(DISPLAY_ROW_CONNECTION,"Fall configured");
+		  }
+		  else
+		  {
+			  displayPrintf(DISPLAY_ROW_CONNECTION,"PB0 - Fall config ");
+		  }
+
+		  if(is_tap_configured)
+		  {
+			  accel_config_tap();
+			  displayPrintf(DISPLAY_ROW_CLIENTADDR,"Tap configured");
+		  }
+		  else
+		  {
+			  displayPrintf(DISPLAY_ROW_CLIENTADDR,"PB1 - Tap config");
+		  }
+
+		  if(is_buzzer_on)
+		  {
+			  displayPrintf(DISPLAY_ROW_PASSKEY,"Buzzer ON");
+			  gpioLed1SetOn();
+			  LOG_DEBUG("BUZZER ON");
+		  }
+		  else
+		  {
+			  displayPrintf(DISPLAY_ROW_PASSKEY,"Buzzer OFF");
+			  LOG_DEBUG("BUZZER OFF\n");
+			  gpioLed1SetOff();
+		  }
+
+		  LOG_DEBUG("FALL CONFIGURED = %d\n", is_fall_configured);
+
+		  LOG_DEBUG("TAP CONFIGURED = %d\n", is_tap_configured);
+
+		  LOG_DEBUG("BUTTON STATE = %d\n", is_buzzer_on);
     	  LOG_INFO("LPN PROVISIONED ADDRESS : %x\n", pData->address);
     	  displayPrintf(DISPLAY_ROW_TEMPVALUE,"Provision address = %x", pData->address);
     	  _elem_index = 0;
@@ -532,21 +549,21 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
     case gecko_evt_mesh_node_provisioning_failed_id:
     	displayPrintf(DISPLAY_ROW_ACTION,"provision fail");
-    	gecko_cmd_hardware_set_soft_timer(2*32768, TIMER_RESTART_ID ,1);
-    	LOG_INFO("provision fail\n");
+    	BTSTACK_CHECK_RESPONSE(gecko_cmd_hardware_set_soft_timer(2*32768, TIMER_RESTART_ID ,1));
+    	LOG_ERROR("provision fail\n");
     	break;
 
     case gecko_evt_mesh_generic_server_client_request_id:
 
     	friend_data = evt->data.evt_mesh_generic_server_client_request.parameters.data[0];
-		LOG_INFO("DATA RECEIVED STATE = %d\n", friend_data);
+		LOG_DEBUG("DATA RECEIVED STATE = %d\n", friend_data);
 
 
 		if(friend_data == 1)
 		{
 			is_buzzer_on = 0;
 			ps_save(PS_KEY_BUZZER_STATE, &is_buzzer_on, sizeof(is_buzzer_on));
-			LOG_INFO("\nTURN ALARM OFF\n");
+			LOG_WARN("\nTURN ALARM OFF\n");
 			displayPrintf(DISPLAY_ROW_PASSKEY,"Buzzer OFF");
 			gpioLed1SetOff();
 		}
@@ -555,7 +572,7 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
     	break;
 
     case gecko_evt_mesh_generic_server_state_changed_id:
-
+    	LOG_DEBUG("Server state changed\n");
     	mesh_lib_generic_server_event_handler(evt);
     	break;
 
@@ -578,20 +595,20 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
       }
       break;
 
-    case gecko_evt_gatt_server_user_write_request_id:
-      if (evt->data.evt_gatt_server_user_write_request.characteristic == gattdb_ota_control) {
-        /* Set flag to enter to OTA mode */
-        boot_to_dfu = 1;
-        /* Send response to Write Request */
-        gecko_cmd_gatt_server_send_user_write_response(
-          evt->data.evt_gatt_server_user_write_request.connection,
-          gattdb_ota_control,
-          bg_err_success);
-
-        /* Close connection to enter to DFU OTA mode */
-        gecko_cmd_le_connection_close(evt->data.evt_gatt_server_user_write_request.connection);
-      }
-      break;
+//    case gecko_evt_gatt_server_user_write_request_id:
+//      if (evt->data.evt_gatt_server_user_write_request.characteristic == gattdb_ota_control) {
+//        /* Set flag to enter to OTA mode */
+//        boot_to_dfu = 1;
+//        /* Send response to Write Request */
+//        gecko_cmd_gatt_server_send_user_write_response(
+//          evt->data.evt_gatt_server_user_write_request.connection,
+//          gattdb_ota_control,
+//          bg_err_success);
+//
+//        /* Close connection to enter to DFU OTA mode */
+//        gecko_cmd_le_connection_close(evt->data.evt_gatt_server_user_write_request.connection);
+//      }
+//      break;
 
     case gecko_evt_mesh_lpn_friendship_established_id:
           LOG_INFO("friendship established\r\n");
@@ -648,7 +665,6 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 				displayPrintf(DISPLAY_ROW_CONNECTION,"Fall configured");
 			}
 
-			LOG_DEBUG("Fall Button state = %d\n",value);
 			ps_save(PS_KEY_FALL_CONFIGURED, &is_fall_configured, sizeof(is_fall_configured));
 			ps_save(PS_KEY_TAP_CONFIGURED, &is_tap_configured, sizeof(is_tap_configured));
 		}
@@ -699,7 +715,7 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 			displayPrintf(DISPLAY_ROW_PASSKEY,"Buzzer ON");
 			gpioLed1SetOn();
 
-			LOG_INFO("\nSOUNDING ALARM FOR FALL DETECTION\n");
+			LOG_WARN("\nSOUNDING ALARM FOR FALL DETECTION\n");
 			level_update_publish(40);	// Publish level 40 signaling fall detected
 
 		}
@@ -721,7 +737,7 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 			level_update_publish(41); // Publish level 41 signaling tap detected
 
-			LOG_INFO("\nSOUNDING ALARM FOR TAP DETECTION\n");
+			LOG_WARN("\nSOUNDING ALARM FOR TAP DETECTION\n");
 
 		}
     	break;
@@ -756,7 +772,6 @@ int main(void)
   // Initialize gpio
   gpioInit();
 
-//  cmu_Init();
 
   gecko_cmd_hardware_set_soft_timer(1 * 32768, DISPLAY_REFRESH, 0); // Set repeating timer for display update and logger timestamp update
 
@@ -766,6 +781,7 @@ int main(void)
 	  LOG_ERROR("Failed in Initializing I2C\n");
 	  return -1;
   }
+
 
   while (1) {
 	struct gecko_cmd_packet *evt = gecko_wait_event();
