@@ -12,8 +12,8 @@
 uint32_t interrupt_flags_set;
 const int lowest_sleep_mode = 0; // Setting the lowest sleep mode
 uint8_t pin_state = 1; // Variable to read PB0 button state
-uint8_t fall_state;
-uint8_t tap_state;
+uint8_t fall_state; // Variable to store patient fall state
+uint8_t tap_state; // Variable to store patient tap state
 
 uint8_t tap_config_button;
 
@@ -294,16 +294,17 @@ level_update_publish
 *
 *
 **/
-void level_update_publish(int8_t button_state)
+void level_update_publish(int8_t level_state)
 {
 
 	struct mesh_generic_state custom_pub;
-	custom_pub.kind = mesh_generic_state_level;
-	custom_pub.level.level = button_state;
+	custom_pub.kind = mesh_generic_state_level; // Set publish model as level
+	custom_pub.level.level = level_state;
 
 	LOG_DEBUG("INSIDE PUBLISHER\n");
 	int result;
 
+	// Perform server update
 	result = mesh_lib_generic_server_update(MESH_GENERIC_LEVEL_SERVER_MODEL_ID,	_elem_index, &custom_pub, 0,0);
 
 	LOG_DEBUG("RESULT = %d\n", result);
@@ -315,6 +316,7 @@ void level_update_publish(int8_t button_state)
 	else
 	{
 		LOG_DEBUG("INSIDE PUBLISHER 1\n");
+		//Perform server publish
 		result = mesh_lib_generic_server_publish(MESH_GENERIC_LEVEL_SERVER_MODEL_ID,
 														_elem_index,
 														mesh_generic_state_level);
@@ -352,14 +354,17 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
   switch (evt_id) {
     case gecko_evt_system_boot_id:
       LOG_DEBUG("Booted\n");
+
       displayPrintf(DISPLAY_ROW_NAME,"Low Power Node");
    	  displayPrintf(DISPLAY_ROW_BTADDR2,"Patient Monitor");
-      if(GPIO_PinInGet(PB0_PORT, PB0_PIN ) == 0 || GPIO_PinInGet(PB1_PORT, PB1_PIN ) == 0)
+
+   	  if(GPIO_PinInGet(PB0_PORT, PB0_PIN ) == 0 || GPIO_PinInGet(PB1_PORT, PB1_PIN ) == 0) //Factory reset condition
       {
     	  // Erase persistent storage
     	  gecko_cmd_flash_ps_erase_all();
 
     	  LOG_INFO("Factory Reset\n");
+
     	  displayPrintf(DISPLAY_ROW_ACTION,"Factory Reset");
 
     	  // Wait for 2 seconds
@@ -372,6 +377,7 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
     	  ps_load(PS_KEY_TAP_CONFIGURED, &is_tap_configured, sizeof(is_tap_configured));
     	  ps_load(PS_KEY_BUZZER_STATE, &is_buzzer_on, sizeof(is_buzzer_on));
 
+    	  // Check persistent storage on boot up to enable required modes
     	  if(is_fall_configured)
     	  {
     		  accel_config_freefall();
@@ -395,19 +401,21 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
     	  if(is_buzzer_on)
     	  {
     		  displayPrintf(DISPLAY_ROW_PASSKEY,"Buzzer ON");
+    		  gpioLed1SetOn();
     		  LOG_DEBUG("BUZZER ON");
     	  }
     	  else
     	  {
     		  displayPrintf(DISPLAY_ROW_PASSKEY,"Buzzer OFF");
     		  LOG_DEBUG("BUZZER OFF\n");
+    		  gpioLed1SetOff();
     	  }
 
-    	  LOG_INFO("FALL CONFIGURED? %d\n", is_fall_configured);
+    	  LOG_INFO("FALL CONFIGURED = %d\n", is_fall_configured);
 
-    	  LOG_INFO("TAP CONFIGURED? %d\n", is_tap_configured);
+    	  LOG_INFO("TAP CONFIGURED = %d\n", is_tap_configured);
 
-    	  LOG_INFO("BUTTON STATE? %d\n", is_buzzer_on);
+    	  LOG_INFO("BUTTON STATE = %d\n", is_buzzer_on);
 
     	  struct gecko_msg_system_get_bt_address_rsp_t *gecko_bt_addr = gecko_cmd_system_get_bt_address();
 
@@ -489,7 +497,7 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
       {
     	  _elem_index = 0;
 
-    	  mesh_lib_init(malloc, free, 10);
+    	  mesh_lib_init(malloc, free, 10); // upto 10 models can be added in the .isc
     	  lpn_init();
 
     	  displayPrintf(DISPLAY_ROW_ACTION,"provisioned");
@@ -536,8 +544,8 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 			ps_save(PS_KEY_BUZZER_STATE, &is_buzzer_on, sizeof(is_buzzer_on));
 			LOG_INFO("\nTURN ALARM OFF\n");
 			displayPrintf(DISPLAY_ROW_PASSKEY,"Buzzer OFF");
+			gpioLed1SetOff();
 		}
-//    		mesh_lib_generic_server_event_handler(evt);
 
 
     	break;
@@ -550,7 +558,6 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
     case gecko_evt_le_connection_opened_id:
     	LOG_DEBUG("Connected");
     	num_connections++;
-//    	lpn_deinit();
     	displayPrintf(DISPLAY_ROW_CONNECTION,"connected");
     	break;
 
@@ -614,15 +621,7 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 	  break;
 
     case gecko_evt_system_external_signal_id:
-    	if((evt->data.evt_system_external_signal.extsignals & DISP_INT_MASK))
-		{
-    		CORE_AtomicDisableIrq();
-			interrupt_flags_set &= ~(DISP_INT_MASK); // Disable COMP1 Interrupt bit mask
-			CORE_AtomicEnableIrq();
-			displayUpdate();
-			LOG_DEBUG("Display update call");
-		}
-
+    	// External event handler to configure fall detection mode
     	if((evt->data.evt_system_external_signal.extsignals & FALL_CONFIG_BUTTON) != 0)
 		{
 			CORE_AtomicDisableIrq();
@@ -649,7 +648,7 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 			ps_save(PS_KEY_FALL_CONFIGURED, &is_fall_configured, sizeof(is_fall_configured));
 			ps_save(PS_KEY_TAP_CONFIGURED, &is_tap_configured, sizeof(is_tap_configured));
 		}
-
+    	// External event handler to configure tap detection mode
     	if((evt->data.evt_system_external_signal.extsignals & TAP_CONFIG_BUTTON) != 0)
 		{
 			CORE_AtomicDisableIrq();
@@ -679,6 +678,7 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 			ps_save(PS_KEY_FALL_CONFIGURED, &is_fall_configured, sizeof(is_fall_configured));
     	}
 
+    	// External event handler to publish fall detection
     	if((evt->data.evt_system_external_signal.extsignals & FALL_INT_MASK) && (is_fall_configured) != 0)
 		{
 			CORE_AtomicDisableIrq();
@@ -693,11 +693,13 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 			i2c_read(0x16, 1);
 
 			displayPrintf(DISPLAY_ROW_PASSKEY,"Buzzer ON");
+			gpioLed1SetOn();
 
-			level_update_publish(40);
+			LOG_INFO("\nSOUNDING ALARM FOR FALL DETECTION\n");
+			level_update_publish(40);	// Publish level 40 signaling fall detected
 
 		}
-
+    	// External event handler to publish tap detection
     	if((evt->data.evt_system_external_signal.extsignals & TAP_INT_MASK) && (is_tap_configured) != 0)
 		{
 			CORE_AtomicDisableIrq();
@@ -711,10 +713,11 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 			i2c_read(0X22,1);
 
 			displayPrintf(DISPLAY_ROW_PASSKEY,"Buzzer ON");
+			gpioLed1SetOn();
 
-			level_update_publish(41);
+			level_update_publish(41); // Publish level 41 signaling tap detected
 
-			LOG_INFO("\nSOUNDING ALARM\n");
+			LOG_INFO("\nSOUNDING ALARM FOR TAP DETECTION\n");
 
 		}
     	break;
@@ -740,14 +743,18 @@ int main(void)
   // Initialize stack
   gecko_main_init();
 
+  // Initialize logger
   logInit();
 
+  // Initialize display
   displayInit();
 
+  // Initialize gpio
   gpioInit();
 
-  gecko_cmd_hardware_set_soft_timer(1 * 32768, DISPLAY_REFRESH, 0);
+  gecko_cmd_hardware_set_soft_timer(1 * 32768, DISPLAY_REFRESH, 0); // Set repeating timer for display update and logger timestamp update
 
+  // Initialize i2c
   if(i2c_init() != 0)
   {
 	  LOG_ERROR("Failed in Initializing I2C\n");
