@@ -415,12 +415,6 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 			}
 			break;
 
-    	case TIMER_ID_NODE_CONFIGURED:
-			if (!lpn_active) {
-			LOG_INFO("try to initialize lpn...\r\n");
-			lpn_init();
-			}
-			break;
     	case DISPLAY_REFRESH:
     		timer_count+=1;
     		displayUpdate();
@@ -629,7 +623,7 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 	case gecko_evt_mesh_lpn_friendship_terminated_id:
 	  LOG_INFO("friendship terminated\r\n");
-	  displayPrintf(DISPLAY_ROW_ACTION,"Friend Terminated");
+	  displayPrintf(DISPLAY_ROW_ACTION,"Friend Term");
 	  if (num_connections == 0) {
 		// try again in 2 seconds
 		result = gecko_cmd_hardware_set_soft_timer(TIMER_MS_2_TIMERTICK(2000),
