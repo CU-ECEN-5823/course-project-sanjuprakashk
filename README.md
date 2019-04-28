@@ -3,7 +3,7 @@
 # Low Power Node  
 Group report: https://drive.google.com/drive/u/1/folders/19hdArP41vl--8bYrzDXRaQdipgCvqJyU  
 
-Individual report: https://docs.google.com/document/d/1UDnEOphtXhVLwG6Nfw0Mf7TCO_J4j2PlN-SaW6wZgj0/edit  
+Individual report: https://docs.google.com/document/d/1R7fJJIHysDMEKZR2WjfFpgR2WOkpU7uXLiXtukH0Cd0/edit  
 
 Command table: https://docs.google.com/spreadsheets/u/1/d/1uHh-QOkRwY1GcTBOUW6LPIHZMnQlPVpkgPMqkcA2ELI/edit?usp=drive_web&ouid=115121427441734205213
 
