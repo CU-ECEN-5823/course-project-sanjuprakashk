@@ -493,8 +493,12 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
         displayPrintf(DISPLAY_ROW_ACTION,"unprovisioned");
       }
 
+      struct gecko_msg_mesh_node_initialized_evt_t *pData = (struct gecko_msg_mesh_node_initialized_evt_t *)&(evt->data);
+
       if(evt->data.evt_mesh_node_initialized.provisioned)
       {
+    	  LOG_INFO("LPN PROVISIONED ADDRESS : %x\n", pData->address);
+    	  displayPrintf(DISPLAY_ROW_TEMPVALUE,"Provision address = %x", pData->address);
     	  _elem_index = 0;
 
     	  mesh_lib_init(malloc, free, 10); // upto 10 models can be added in the .isc
@@ -752,6 +756,8 @@ int main(void)
   // Initialize gpio
   gpioInit();
 
+//  cmu_Init();
+
   gecko_cmd_hardware_set_soft_timer(1 * 32768, DISPLAY_REFRESH, 0); // Set repeating timer for display update and logger timestamp update
 
   // Initialize i2c
@@ -760,7 +766,6 @@ int main(void)
 	  LOG_ERROR("Failed in Initializing I2C\n");
 	  return -1;
   }
-
 
   while (1) {
 	struct gecko_cmd_packet *evt = gecko_wait_event();
