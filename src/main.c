@@ -708,6 +708,8 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 			displayPrintf(DISPLAY_ROW_PASSKEY,"Buzzer ON");
 			gpioLed1SetOn();
+			is_buzzer_on = 1;
+			ps_save(PS_KEY_BUZZER_STATE, &is_buzzer_on, sizeof(is_buzzer_on));
 
 			LOG_WARN("\nSOUNDING ALARM FOR FALL DETECTION\n");
 			level_update_publish(40);	// Publish level 40 signaling fall detected
@@ -728,6 +730,9 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 			displayPrintf(DISPLAY_ROW_PASSKEY,"Buzzer ON");
 			gpioLed1SetOn();
+
+			is_buzzer_on = 1;
+			ps_save(PS_KEY_BUZZER_STATE, &is_buzzer_on, sizeof(is_buzzer_on));
 
 			level_update_publish(41); // Publish level 41 signaling tap detected
 
