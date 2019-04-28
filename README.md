@@ -5,6 +5,8 @@ Group report: https://drive.google.com/drive/u/1/folders/19hdArP41vl--8bYrzDXRaQ
 
 Individual report: https://docs.google.com/document/d/1UDnEOphtXhVLwG6Nfw0Mf7TCO_J4j2PlN-SaW6wZgj0/edit  
 
+Command table: https://docs.google.com/spreadsheets/u/1/d/1uHh-QOkRwY1GcTBOUW6LPIHZMnQlPVpkgPMqkcA2ELI/edit?usp=drive_web&ouid=115121427441734205213
+
 # April 13th, 2019 - Project Update 1  
 
 1) Interfaced accelerometer and tested fall detection functionality  
@@ -20,9 +22,9 @@ Working:
 1) If fall or tap is detected a buzzer starts to sound and status is published to the friend node  
 2) Friend node responds with a signal to turn off the buzzer  
 
-# Tasks for upcoming week  
-1) OOB authentication and persistent storage  
-2) Using more than one mesh model for communication  
-3) Making both tap detection and fall detection work together  
+# April 27th, 2019 - Final Project
+1) Pressing PB0 configures fall detection mode  
+2) Pressing PB1 configures tap detection mode  
+3) Mesh communication between friend and low power node successful using 2 mesh models - ON/OFF, Level model   
 
 
