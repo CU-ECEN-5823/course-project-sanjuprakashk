@@ -25,6 +25,7 @@ Working:
 # April 27th, 2019 - Final Project
 1) Pressing PB0 configures fall detection mode  
 2) Pressing PB1 configures tap detection mode  
-3) Mesh communication between friend and low power node successful using 2 mesh models - ON/OFF, Level model   
+3) Mesh communication between friend and low power node successful using 2 mesh models - ON/OFF, Level model  
+4) Alarm notification is emulated by turning ON/OFF the onboard LED. A Buzzer ON/OFF message is displayed on the LCD  
 
 
