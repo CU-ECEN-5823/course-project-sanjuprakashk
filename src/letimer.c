@@ -148,14 +148,14 @@ void LETIMER0_IRQHandler()
 
 	if(flags & LETIMER_IF_COMP0) // Compares the flag with COMP0 value
 	{
-		disp_count+=1;
+//		disp_count+=1;
 		LETIMER_IntClear(LETIMER0,LETIMER_IFC_COMP0); //Clears the COMP0 interrupt flag
-		interrupt_flags_set |= DISP_INT_MASK; // Setting Display interrupt bit mask
+//		interrupt_flags_set |= DISP_INT_MASK; // Setting Display interrupt bit mask
 		timer_count+=1;
 	}
 
 	CORE_ATOMIC_IRQ_ENABLE();
 
-	gecko_external_signal(interrupt_flags_set); // Set gecko external event
+//	gecko_external_signal(interrupt_flags_set); // Set gecko external event
 
 }

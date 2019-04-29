@@ -1,51 +1,27 @@
-#include <stdbool.h>
-#include "letimer.h"
-#include "cmu_config.h"
-#include "display.h"
-#include "src/ble_mesh_device_type.h"
-#include "sleep.h"
-#include "em_emu.h"
-
-#include "init_mcu.h"
-#include "init_board.h"
-#include "gatt_db.h"
-#include <gecko_configuration.h>
-#include <mesh_sizes.h>
-
-#include "gpio.h"
-#include "log.h"
-#include "display.h"
-#include "letimer.h"
-#include "i2c_config.h"
-
-#include "mesh_generic_model_capi_types.h"
-
-#include "mesh_lib.h"
+/*
+ * File : main.c
+ *
+ *  Created on: Apr 13, 2019
+ *  Author: Sanju Prakash Kannioth
+ *  Reference: Silicon labs light switch example mesh implementation
+ */
+#include "main.h"
 
 
-#define FACTORY_RESET_ID 78
-#define TIMER_RESTART_ID 77
-#define TIMER_ID_FRIEND_FIND 20
-#define TIMER_ID_NODE_CONFIGURED  30
-#define TIMER_ID_PROVISIONING     66
-
-#define TIMER_CLK_FREQ ((uint32)32768)
-
-#define TIMER_MS_2_TIMERTICK(ms) ((TIMER_CLK_FREQ * ms) / 1000)
 
 uint32_t interrupt_flags_set;
 const int lowest_sleep_mode = 0; // Setting the lowest sleep mode
 uint8_t pin_state = 1; // Variable to read PB0 button state
-uint8_t fall_state;
-uint8_t tap_state;
+uint8_t fall_state; // Variable to store patient fall state
+uint8_t tap_state; // Variable to store patient tap state
+
+uint8_t tap_config_button;
 
 static uint8 num_connections = 0;
 
 volatile uint8_t pin_pressed_flag = 0;
 
 bool mesh_bgapi_listener(struct gecko_cmd_packet *evt);
-
-
 
 // bluetooth stack heap
 #define MAX_CONNECTIONS 2
@@ -86,6 +62,7 @@ static uint16 _elem_index = 0xffff;
 
 const gecko_configuration_t config =
 {
+  .sleep.flags = SLEEP_FLAGS_DEEP_SLEEP_ENABLE,
   .bluetooth.max_connections = MAX_CONNECTIONS,
   .bluetooth.max_advertisers = MAX_ADVERTISERS,
   .bluetooth.heap = bluetooth_stack_heap,
@@ -107,41 +84,19 @@ const gecko_configuration_t config =
 
 
 /**
- * See light switch app.c file definition
- */
-void gecko_bgapi_classes_init_server_friend(void)
-{
-	gecko_bgapi_class_dfu_init();
-	gecko_bgapi_class_system_init();
-	gecko_bgapi_class_le_gap_init();
-	gecko_bgapi_class_le_connection_init();
-	//gecko_bgapi_class_gatt_init();
-	gecko_bgapi_class_gatt_server_init();
-	gecko_bgapi_class_hardware_init();
-	gecko_bgapi_class_flash_init();
-	gecko_bgapi_class_test_init();
-	//gecko_bgapi_class_sm_init();
-	//mesh_native_bgapi_init();
-	gecko_bgapi_class_mesh_node_init();
-	//gecko_bgapi_class_mesh_prov_init();
-	gecko_bgapi_class_mesh_proxy_init();
-	gecko_bgapi_class_mesh_proxy_server_init();
-	//gecko_bgapi_class_mesh_proxy_client_init();
-	//gecko_bgapi_class_mesh_generic_client_init();
-	gecko_bgapi_class_mesh_generic_server_init();
-	//gecko_bgapi_class_mesh_vendor_model_init();
-	//gecko_bgapi_class_mesh_health_client_init();
-	//gecko_bgapi_class_mesh_health_server_init();
-	//gecko_bgapi_class_mesh_test_init();
-	gecko_bgapi_class_mesh_lpn_init();
-	//gecko_bgapi_class_mesh_friend_init();
-}
-
-
-/**
- * See main function list in soc-btmesh-switch project file
- */
-void gecko_bgapi_classes_init_client_lpn(void)
+--------------------------------------------------------------------------------------------
+gecko_bgapi_classes_init_server_lpn
+--------------------------------------------------------------------------------------------
+*	This function works as the initialization for lpn as server
+*
+* 	@\param			void
+*
+* 	@\return		void
+*
+* 	Reference : Function list in soc-btmesh-switch project file
+*
+**/
+void gecko_bgapi_classes_init_server_lpn(void)
 {
 	gecko_bgapi_class_dfu_init();
 	gecko_bgapi_class_system_init();
@@ -171,6 +126,21 @@ void gecko_bgapi_classes_init_client_lpn(void)
 	//gecko_bgapi_class_mesh_friend_init();
 
 }
+
+
+/**
+--------------------------------------------------------------------------------------------
+gecko_main_init
+--------------------------------------------------------------------------------------------
+*	This function works as the initialization for the board and mesh stack
+*
+* 	@\param			void
+*
+* 	@\return		void
+*
+* 	Reference : Function list in soc-btmesh-switch project file
+*
+**/
 void gecko_main_init()
 {
   // Initialize device
@@ -186,14 +156,26 @@ void gecko_main_init()
 
   gecko_stack_init(&config);
 
-  gecko_bgapi_classes_init_client_lpn();
+  gecko_bgapi_classes_init_server_lpn();
 
   // Initialize coexistence interface. Parameters are taken from HAL config.
   gecko_initCoexHAL();
 
 }
 
-
+/**
+--------------------------------------------------------------------------------------------
+lpn_init
+--------------------------------------------------------------------------------------------
+*	This function works as the initialization for lpn
+*
+* 	@\param			void
+*
+* 	@\return		void
+*
+* 	Reference : Function list in soc-btmesh-switch project file
+*
+**/
 void lpn_init(void)
 {
   uint16 result;
@@ -230,6 +212,20 @@ void lpn_init(void)
   }
 }
 
+
+/**
+--------------------------------------------------------------------------------------------
+lpn_deinit
+--------------------------------------------------------------------------------------------
+*	This function works as the de-initialization for lpn
+*
+* 	@\param			void
+*
+* 	@\return		void
+*
+* 	Reference : Function list in soc-btmesh-switch project file
+*
+**/
 void lpn_deinit(void)
 {
   uint16 result;
@@ -256,6 +252,19 @@ void lpn_deinit(void)
   LOG_INFO("LPN deinitialized\r\n");
  }
 
+
+/**
+--------------------------------------------------------------------------------------------
+set_device_name
+--------------------------------------------------------------------------------------------
+*	This function sets the device name string
+*
+* 	@\param			addr
+*
+* 	@\return		void
+*
+*
+**/
 void set_device_name(bd_addr *addr)
 {
 	char name[20];
@@ -269,25 +278,41 @@ void set_device_name(bd_addr *addr)
 	gecko_cmd_gatt_server_write_attribute_value(gattdb_device_name, 0, strlen(name), (uint8 *)name);
 }
 
-
-void level_update_publish(int8_t button_state)
+/**
+--------------------------------------------------------------------------------------------
+level_update_publish
+--------------------------------------------------------------------------------------------
+*	This function works as the level publish function
+*
+* 	@\param			button_state
+*
+* 	@\return		void
+*
+*
+**/
+void level_update_publish(int8_t level_state)
 {
 
 	struct mesh_generic_state custom_pub;
-	custom_pub.kind = mesh_generic_state_level;
-	custom_pub.level.level = button_state;
+	custom_pub.kind = mesh_generic_state_level; // Set publish model as level
+	custom_pub.level.level = level_state;
 
+	LOG_DEBUG("INSIDE PUBLISHER\n");
 	int result;
 
+	// Perform server update
 	result = mesh_lib_generic_server_update(MESH_GENERIC_LEVEL_SERVER_MODEL_ID,	_elem_index, &custom_pub, 0,0);
 
+	LOG_DEBUG("RESULT = %d\n", result);
 	if(result)
 	{
-		LOG_ERROR("Error is publish update\n");
+		LOG_ERROR("Error is publish update = %d\n", result);
 	}
 
 	else
 	{
+		LOG_DEBUG("INSIDE PUBLISHER 1\n");
+		//Perform server publish
 		result = mesh_lib_generic_server_publish(MESH_GENERIC_LEVEL_SERVER_MODEL_ID,
 														_elem_index,
 														mesh_generic_state_level);
@@ -298,12 +323,25 @@ void level_update_publish(int8_t button_state)
 		}
 		else
 		{
-			LOG_INFO("Publish success\n");
+			LOG_DEBUG("Publish success\n");
 		}
 	}
 
 }
 
+/**
+--------------------------------------------------------------------------------------------
+gecko_event_handler
+--------------------------------------------------------------------------------------------
+*	This function works as the event handler for the mesh stack
+*
+* 	@\param			evt_id, evt
+*
+* 	@\return		void
+*
+* 	Reference : Function list in soc-btmesh-switch project file
+*
+**/
 
 void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 {
@@ -311,17 +349,22 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
   uint8_t friend_data;
   switch (evt_id) {
     case gecko_evt_system_boot_id:
-    	LOG_INFO("Booted\n");
-      if(GPIO_PinInGet(PB0_PORT, PB0_PIN ) == 0 || GPIO_PinInGet(PB1_PORT, PB1_PIN ) == 0)
+      LOG_DEBUG("Booted\n");
+
+      displayPrintf(DISPLAY_ROW_NAME,"Low Power Node");
+   	  displayPrintf(DISPLAY_ROW_BTADDR2,"Patient Monitor");
+
+   	  if(GPIO_PinInGet(PB0_PORT, PB0_PIN ) == 0 || GPIO_PinInGet(PB1_PORT, PB1_PIN ) == 0) //Factory reset condition
       {
     	  // Erase persistent storage
-    	  gecko_cmd_flash_ps_erase_all();
+   		  BTSTACK_CHECK_RESPONSE(gecko_cmd_flash_ps_erase_all());
 
     	  LOG_INFO("Factory Reset\n");
+
     	  displayPrintf(DISPLAY_ROW_ACTION,"Factory Reset");
 
     	  // Wait for 2 seconds
-    	  gecko_cmd_hardware_set_soft_timer(2 * 32768, FACTORY_RESET_ID, 1);
+    	  BTSTACK_CHECK_RESPONSE(gecko_cmd_hardware_set_soft_timer(2 * 32768, FACTORY_RESET_ID, 1));
       }
 
       else
@@ -372,12 +415,10 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 			}
 			break;
 
-    	case TIMER_ID_NODE_CONFIGURED:
-			if (!lpn_active) {
-			LOG_INFO("try to initialize lpn...\r\n");
-			lpn_init();
-			}
-			break;
+    	case DISPLAY_REFRESH:
+    		timer_count+=1;
+    		displayUpdate();
+    		break;
     	}
     	break;
 
@@ -398,16 +439,85 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
         displayPrintf(DISPLAY_ROW_ACTION,"unprovisioned");
       }
 
+      struct gecko_msg_mesh_node_initialized_evt_t *pData = (struct gecko_msg_mesh_node_initialized_evt_t *)&(evt->data);
+
       if(evt->data.evt_mesh_node_initialized.provisioned)
       {
+    	  // Load data from persistent storage
+    	  if(ps_load(PS_KEY_FALL_CONFIGURED, &is_fall_configured, sizeof(is_fall_configured)) == 0)
+    	  {
+    		  LOG_DEBUG("PS LOAD of fall config loaded successfully\n");
+    	  }
+    	  else
+    	  {
+    		  LOG_DEBUG("PS LOAD of fall config load failed\n");
+    	  }
+		  if(ps_load(PS_KEY_TAP_CONFIGURED, &is_tap_configured, sizeof(is_tap_configured)) == 0)
+		  {
+			  LOG_DEBUG("PS LOAD of tap config loaded successfully\n");
+		  }
+		  else
+		  {
+			  LOG_DEBUG("PS LOAD of tap config load failed\n");
+		  }
+		  if(ps_load(PS_KEY_BUZZER_STATE, &is_buzzer_on, sizeof(is_buzzer_on)) == 0)
+		  {
+			  LOG_DEBUG("PS LOAD of buzzer state loaded successfully\n");
+		  }
+		  else
+		  {
+			  LOG_DEBUG("PS LOAD of buzzer state load failed\n");
+		  }
+
+		  // Check persistent storage on provisioning to enable required modes
+		  if(is_fall_configured)
+		  {
+			  accel_config_freefall();
+			  displayPrintf(DISPLAY_ROW_CONNECTION,"Fall configured");
+		  }
+		  else
+		  {
+			  displayPrintf(DISPLAY_ROW_CONNECTION,"PB0 - Fall config ");
+		  }
+
+		  if(is_tap_configured)
+		  {
+			  accel_config_tap();
+			  displayPrintf(DISPLAY_ROW_CLIENTADDR,"Tap configured");
+		  }
+		  else
+		  {
+			  displayPrintf(DISPLAY_ROW_CLIENTADDR,"PB1 - Tap config");
+		  }
+
+		  if(is_buzzer_on)
+		  {
+			  displayPrintf(DISPLAY_ROW_PASSKEY,"Buzzer ON");
+			  gpioLed1SetOn();
+			  LOG_DEBUG("BUZZER ON");
+		  }
+		  else
+		  {
+			  displayPrintf(DISPLAY_ROW_PASSKEY,"Buzzer OFF");
+			  LOG_DEBUG("BUZZER OFF\n");
+			  gpioLed1SetOff();
+		  }
+
+		  LOG_DEBUG("FALL CONFIGURED = %d\n", is_fall_configured);
+
+		  LOG_DEBUG("TAP CONFIGURED = %d\n", is_tap_configured);
+
+		  LOG_DEBUG("BUTTON STATE = %d\n", is_buzzer_on);
+    	  LOG_INFO("LPN PROVISIONED ADDRESS : %x\n", pData->address);
+    	  displayPrintf(DISPLAY_ROW_TEMPVALUE,"Provision address = %x", pData->address);
     	  _elem_index = 0;
 
-    	  mesh_lib_init(malloc, free, 8);
+    	  mesh_lib_init(malloc, free, 10); // upto 10 models can be added in the .isc
     	  lpn_init();
 
     	  displayPrintf(DISPLAY_ROW_ACTION,"provisioned");
 
-    	  PB0_interrupt_enable();
+    	  interrupt_enable();
 
       }
 
@@ -424,7 +534,7 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
     	_elem_index = 0;
 
-    	mesh_lib_init(malloc, free, 8);
+    	mesh_lib_init(malloc, free, 10);
 
     	LOG_INFO("provisioned\n");
 
@@ -433,34 +543,36 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
     case gecko_evt_mesh_node_provisioning_failed_id:
     	displayPrintf(DISPLAY_ROW_ACTION,"provision fail");
-    	gecko_cmd_hardware_set_soft_timer(2*32768, TIMER_RESTART_ID ,1);
-    	LOG_INFO("provision fail\n");
+    	BTSTACK_CHECK_RESPONSE(gecko_cmd_hardware_set_soft_timer(2*32768, TIMER_RESTART_ID ,1));
+    	LOG_ERROR("provision fail\n");
     	break;
 
     case gecko_evt_mesh_generic_server_client_request_id:
 
     	friend_data = evt->data.evt_mesh_generic_server_client_request.parameters.data[0];
-		LOG_INFO("DATA RECEIVED STATE = %d\n", friend_data);
+		LOG_DEBUG("DATA RECEIVED STATE = %d\n", friend_data);
 
 
 		if(friend_data == 1)
 		{
-			LOG_INFO("\nTURN ALARM OFF\n");
+			is_buzzer_on = 0;
+			ps_save(PS_KEY_BUZZER_STATE, &is_buzzer_on, sizeof(is_buzzer_on));
+			LOG_WARN("\nTURN ALARM OFF\n");
+			displayPrintf(DISPLAY_ROW_PASSKEY,"Buzzer OFF");
+			gpioLed1SetOff();
 		}
-//    		mesh_lib_generic_server_event_handler(evt);
 
 
     	break;
 
     case gecko_evt_mesh_generic_server_state_changed_id:
-
+    	LOG_DEBUG("Server state changed\n");
     	mesh_lib_generic_server_event_handler(evt);
     	break;
 
     case gecko_evt_le_connection_opened_id:
-    	LOG_INFO("Connected");
+    	LOG_DEBUG("Connected");
     	num_connections++;
-//    	lpn_deinit();
     	displayPrintf(DISPLAY_ROW_CONNECTION,"connected");
     	break;
 
@@ -477,27 +589,29 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
       }
       break;
 
-    case gecko_evt_gatt_server_user_write_request_id:
-      if (evt->data.evt_gatt_server_user_write_request.characteristic == gattdb_ota_control) {
-        /* Set flag to enter to OTA mode */
-        boot_to_dfu = 1;
-        /* Send response to Write Request */
-        gecko_cmd_gatt_server_send_user_write_response(
-          evt->data.evt_gatt_server_user_write_request.connection,
-          gattdb_ota_control,
-          bg_err_success);
-
-        /* Close connection to enter to DFU OTA mode */
-        gecko_cmd_le_connection_close(evt->data.evt_gatt_server_user_write_request.connection);
-      }
-      break;
+//    case gecko_evt_gatt_server_user_write_request_id:
+//      if (evt->data.evt_gatt_server_user_write_request.characteristic == gattdb_ota_control) {
+//        /* Set flag to enter to OTA mode */
+//        boot_to_dfu = 1;
+//        /* Send response to Write Request */
+//        gecko_cmd_gatt_server_send_user_write_response(
+//          evt->data.evt_gatt_server_user_write_request.connection,
+//          gattdb_ota_control,
+//          bg_err_success);
+//
+//        /* Close connection to enter to DFU OTA mode */
+//        gecko_cmd_le_connection_close(evt->data.evt_gatt_server_user_write_request.connection);
+//      }
+//      break;
 
     case gecko_evt_mesh_lpn_friendship_established_id:
           LOG_INFO("friendship established\r\n");
+          displayPrintf(DISPLAY_ROW_ACTION,"Friend Established");
       break;
 
     case gecko_evt_mesh_lpn_friendship_failed_id:
 	  LOG_ERROR("friendship failed\r\n");
+	  displayPrintf(DISPLAY_ROW_ACTION,"Friendship Failed");
 	  // try again in 2 seconds
 	  result = gecko_cmd_hardware_set_soft_timer(TIMER_MS_2_TIMERTICK(2000),
 												 TIMER_ID_FRIEND_FIND,
@@ -509,6 +623,7 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 	case gecko_evt_mesh_lpn_friendship_terminated_id:
 	  LOG_INFO("friendship terminated\r\n");
+	  displayPrintf(DISPLAY_ROW_ACTION,"Friend Term");
 	  if (num_connections == 0) {
 		// try again in 2 seconds
 		result = gecko_cmd_hardware_set_soft_timer(TIMER_MS_2_TIMERTICK(2000),
@@ -521,31 +636,64 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 	  break;
 
     case gecko_evt_system_external_signal_id:
-    	if((evt->data.evt_system_external_signal.extsignals & DISP_INT_MASK))
-		{
-    		CORE_AtomicDisableIrq();
-			interrupt_flags_set &= ~(DISP_INT_MASK); // Disable COMP1 Interrupt bit mask
-			CORE_AtomicEnableIrq();
-			displayUpdate();
-			LOG_DEBUG("Display update call");
-		}
-
-    	if((evt->data.evt_system_external_signal.extsignals & BUTTON_INT_MASK) != 0)
+    	// External event handler to configure fall detection mode
+    	if((evt->data.evt_system_external_signal.extsignals & FALL_CONFIG_BUTTON) != 0)
 		{
 			CORE_AtomicDisableIrq();
-			interrupt_flags_set &= ~(BUTTON_INT_MASK); // Disable Button PB0 Interrupt bit mask
+			interrupt_flags_set &= ~(FALL_CONFIG_BUTTON); // Disable Button PB0 Interrupt bit mask
 			CORE_AtomicEnableIrq();
 
-			bool value = !pin_state;
+			if(accel_config_freefall() != 0)
+			{
+				LOG_ERROR("Failed in Initializing free fall mode\n");
+				is_fall_configured = 0;
+				displayPrintf(DISPLAY_ROW_CLIENTADDR,"PB1 - Tap config");
+				displayPrintf(DISPLAY_ROW_CONNECTION,"Fall configure failed");
+			}
+			else
+			{
+				is_fall_configured = 1;
+				is_tap_configured =0;
 
-//			i2c_read(0X00,1);
+				displayPrintf(DISPLAY_ROW_CLIENTADDR,"PB1 - Tap config");
+				displayPrintf(DISPLAY_ROW_CONNECTION,"Fall configured");
+			}
 
-			LOG_INFO("Button state = %d\n",value);
-
-			level_update_publish(value + 10);
+			ps_save(PS_KEY_FALL_CONFIGURED, &is_fall_configured, sizeof(is_fall_configured));
+			ps_save(PS_KEY_TAP_CONFIGURED, &is_tap_configured, sizeof(is_tap_configured));
 		}
+    	// External event handler to configure tap detection mode
+    	if((evt->data.evt_system_external_signal.extsignals & TAP_CONFIG_BUTTON) != 0)
+		{
+			CORE_AtomicDisableIrq();
+			interrupt_flags_set &= ~(TAP_CONFIG_BUTTON); // Disable Button PB0 Interrupt bit mask
+			CORE_AtomicEnableIrq();
 
-    	if((evt->data.evt_system_external_signal.extsignals & FALL_INT_MASK) != 0)
+			bool value = !tap_config_button;
+
+			if(accel_config_tap() != 0)
+			{
+			  LOG_ERROR("Failed in Initializing tap mode\n");
+			  is_tap_configured = 0;
+			  displayPrintf(DISPLAY_ROW_CLIENTADDR,"Tap configure failed");
+			  displayPrintf(DISPLAY_ROW_CONNECTION,"PB0 - Fall config");
+			}
+			else
+			{
+				is_tap_configured = 1;
+				is_fall_configured = 0;
+
+				displayPrintf(DISPLAY_ROW_CLIENTADDR,"Tap configured");
+				displayPrintf(DISPLAY_ROW_CONNECTION,"PB0 - Fall config");
+			}
+
+			LOG_DEBUG("Tap Button state = %d\n",value);
+			ps_save(PS_KEY_TAP_CONFIGURED, &is_tap_configured, sizeof(is_tap_configured));
+			ps_save(PS_KEY_FALL_CONFIGURED, &is_fall_configured, sizeof(is_fall_configured));
+    	}
+
+    	// External event handler to publish fall detection
+    	if((evt->data.evt_system_external_signal.extsignals & FALL_INT_MASK) && (is_fall_configured) != 0)
 		{
 			CORE_AtomicDisableIrq();
 			interrupt_flags_set &= ~(FALL_INT_MASK); // Disable Fall Interrupt bit mask
@@ -553,17 +701,22 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 			bool value = fall_state;
 
-			LOG_INFO("Fall state = %d\n",value);
+			LOG_DEBUG("Fall state = %d\n",value);
 
-//			i2c_read(0X16,1);
 
-			LOG_INFO("READ RESULT = %x\n", data_array[0]);
+			i2c_read(0x16, 1);
 
-			level_update_publish(40);
+			displayPrintf(DISPLAY_ROW_PASSKEY,"Buzzer ON");
+			gpioLed1SetOn();
+			is_buzzer_on = 1;
+			ps_save(PS_KEY_BUZZER_STATE, &is_buzzer_on, sizeof(is_buzzer_on));
+
+			LOG_WARN("\nSOUNDING ALARM FOR FALL DETECTION\n");
+			level_update_publish(40);	// Publish level 40 signaling fall detected
 
 		}
-
-    	if((evt->data.evt_system_external_signal.extsignals & TAP_INT_MASK) != 0)
+    	// External event handler to publish tap detection
+    	if((evt->data.evt_system_external_signal.extsignals & TAP_INT_MASK) && (is_tap_configured) != 0)
 		{
 			CORE_AtomicDisableIrq();
 			interrupt_flags_set &= ~(TAP_INT_MASK); // Disable Fall Interrupt bit mask
@@ -571,15 +724,19 @@ void gecko_event_handler(uint32_t evt_id, struct gecko_cmd_packet *evt)
 
 			bool value = tap_state;
 
-			LOG_INFO("Tap state = %d\n",value);
+			LOG_DEBUG("Tap state = %d\n",value);
 
-//			i2c_read(0X16,1);
+			i2c_read(0X22,1);
 
-			LOG_INFO("READ RESULT = %x\n", data_array[0]);
+			displayPrintf(DISPLAY_ROW_PASSKEY,"Buzzer ON");
+			gpioLed1SetOn();
 
-			level_update_publish(41);
+			is_buzzer_on = 1;
+			ps_save(PS_KEY_BUZZER_STATE, &is_buzzer_on, sizeof(is_buzzer_on));
 
-			LOG_INFO("\nSOUNDING ALARM\n");
+			level_update_publish(41); // Publish level 41 signaling tap detected
+
+			LOG_WARN("\nSOUNDING ALARM FOR TAP DETECTION\n");
 
 		}
     	break;
@@ -605,58 +762,26 @@ int main(void)
   // Initialize stack
   gecko_main_init();
 
+  // Initialize logger
   logInit();
 
-  // Initialize CMU
-  cmu_Init();
-
-  //Initialize LETIMER0
-  LETIMER0_init();
-
+  // Initialize display
   displayInit();
 
+  // Initialize gpio
   gpioInit();
 
 
+  gecko_cmd_hardware_set_soft_timer(1 * 32768, DISPLAY_REFRESH, 0); // Set repeating timer for display update and logger timestamp update
+
+  // Initialize i2c
   if(i2c_init() != 0)
   {
 	  LOG_ERROR("Failed in Initializing I2C\n");
 	  return -1;
   }
 
-  if(i2c_write(0x2A, 0x20) != 0)
-  {
-	  LOG_ERROR("Failed in putting device in standby mode\n");
-  }
 
-  if(accel_config_freefall() != 0)
-  {
-	  LOG_ERROR("Failed in Initializing free fall mode\n");
-  }
-
-  if(accel_config_tap() != 0)
-  {
-	  LOG_ERROR("Failed in Initializing tap mode\n");
-  }
-
-
-  if(i2c_read(0x2A, 1) != 0)
-  {
-	  LOG_ERROR("Failed in Read\n");
-  }
-
-  int temp = data_array[0];
-  temp |= 0x01;
-
-  LOG_DEBUG("CNTRL REG = %x", temp);
-
-  if(i2c_write(0x2A, temp) != 0)
-  {
-	  LOG_ERROR("Failed in putting device in active mode\n");
-  }
-
-
- /* Infinite loop */
   while (1) {
 	struct gecko_cmd_packet *evt = gecko_wait_event();
 	bool pass = mesh_bgapi_listener(evt);
